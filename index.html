@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="only light">
+<meta name="supported-color-schemes" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="House HQ">
+<meta name="theme-color" id="themecolor" content="#FFFFFF">
+<title>House HQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#EEF0EC;color:#1B2A24;font-family:Barlow,system-ui,sans-serif}</style>
+<style id="sty"></style>
+</head>
+<body>
+<script type="module">
+// Firebase is only downloaded when a house code is in use.
+window.loadFB=async()=>{
+  if(window.FB!==undefined) return window.FB;
+  try{
+    const B='https://www.gstatic.com/firebasejs/'+(window.FIREBASE_SDK_VERSION||'12.17.1')+'/';
+    const [a,f,u]=await Promise.all([import(B+'firebase-app.js'),import(B+'firebase-firestore.js'),import(B+'firebase-auth.js')]);
+    window.FB={...a,...f,...u};
+  }catch(e){ window.FB=null; window.FBerr=e; }
+  return window.FB;
+};
+window.dispatchEvent(new Event('fbloader'));
+</script>
+
+<div class="wrap">
+  <header>
+    <div class="hrow">
+      <div>
+        <div class="hname" id="hname">House HQ</div>
+        <div class="hsub" id="hsub"></div>
+      </div>
+      <div class="hstat"><b id="hdone">0</b><span id="htotal">of 0</span></div>
+    </div>
+    <div class="gauge" id="gauge"></div>
+    <div class="seasons" id="seasons"></div>
+  </header>
+  <div id="note"></div>
+  <main id="view" class="pad"></main>
+  <nav id="nav"></nav>
+</div>
+<div id="modal"></div>
+<input type="file" id="picker" accept="image/*" capture="environment">
+
+<script>
+/* ============================================================
+   Icons
+============================================================ */
+const I = {
+  check:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  list:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+  cal:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="1"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  cam:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  coin:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5h-2.5a1.75 1.75 0 0 0 0 3.5H14.5"/></svg>',
+  wrench:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  home:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  plus:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  trash:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  pencil:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>',
+  doc:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  x:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  left:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>',
+  right:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>',
+  img:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="1"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+  save:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+};
+
+/* ============================================================
+   Storage
+   On a phone or in a normal browser: IndexedDB, which has room
+   for photos. If that is blocked: localStorage. Inside Claude:
+   the artifact storage. Memory as a last resort.
+   Everything saves automatically — there is no Save button.
+============================================================ */
+const KEY='househq3', PKEY=id=>'hqphoto:'+id;
+const timeout=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timed out')),ms))]);
+
+const idb={
+  db:null,
+  open(){
+    return new Promise((res,rej)=>{
+      let req;
+      try{ req=indexedDB.open('househq',1); }catch(e){ return rej(e); }
+      req.onupgradeneeded=()=>{ const db=req.result; if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv'); };
+      req.onsuccess=()=>{ this.db=req.result; this.db.onversionchange=()=>{ this.db.close(); this.db=null; }; res(); };
+      req.onerror=()=>rej(req.error||new Error('could not open the database'));
+      req.onblocked=()=>rej(new Error('database blocked'));
+    });
+  },
+  tx(mode,fn){
+    return new Promise((res,rej)=>{
+      if(!this.db) return rej(new Error('database closed'));
+      let out;
+      const tx=this.db.transaction('kv',mode);
+      tx.oncomplete=()=>res(out);
+      tx.onerror=()=>rej(tx.error||new Error('transaction failed'));
+      tx.onabort=()=>rej(tx.error||new Error('transaction aborted'));
+      const r=fn(tx.objectStore('kv'));
+      if(r) r.onsuccess=()=>{ out=r.result; };
+    });
+  },
+  get(k){ return this.tx('readonly',s=>s.get(k)).then(v=>v===undefined?null:v); },
+  set(k,v){ return this.tx('readwrite',s=>s.put(v,k)).then(()=>true); },
+  del(k){ return this.tx('readwrite',s=>s.delete(k)).then(()=>true); }
+};
+
+const mem={};
+const store={
+  mode:'memory',
+  async init(){
+    // Inside Claude the artifact storage is the only thing that persists.
+    if(window.storage && typeof window.storage.get==='function'){ this.mode='artifact'; return; }
+    try{
+      await timeout(idb.open(),4000);
+      await timeout(idb.set('__probe__','1'),4000);
+      await idb.del('__probe__');
+      this.mode='idb';
+      await this.migrateFromLocal();
+      if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+      return;
+    }catch(e){}
+    try{ localStorage.setItem('__probe__','1'); localStorage.removeItem('__probe__'); this.mode='local'; return; }
+    catch(e){}
+    this.mode='memory';
+  },
+  // An earlier version kept its data in localStorage. Carry it over once.
+  async migrateFromLocal(){
+    try{
+      if(await idb.get(KEY)) return;
+      const raw=localStorage.getItem(KEY); if(!raw) return;
+      await idb.set(KEY,raw);
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(k && k.startsWith('hqphoto:')){ const v=localStorage.getItem(k); if(v) await idb.set(k,v); }
+      }
+    }catch(e){}
+  },
+  async get(k){
+    if(this.mode==='idb'){ try{ return await idb.get(k); }catch(e){ return null; } }
+    if(this.mode==='artifact'){ try{ const r=await timeout(window.storage.get(k,false),8000); return r?r.value:null; }catch(e){ return null; } }
+    if(this.mode==='local'){ return localStorage.getItem(k); }
+    return mem[k]??null;
+  },
+  async set(k,v){
+    if(this.mode==='idb'){ try{ return await idb.set(k,v); }catch(e){ return false; } }
+    if(this.mode==='artifact'){
+      for(let attempt=0;attempt<2;attempt++){
+        try{ const r=await timeout(window.storage.set(k,v,false),8000); if(r!==null&&r!==undefined) return true; }catch(e){}
+        await new Promise(r=>setTimeout(r,400));
+      }
+      return false;
+    }
+    if(this.mode==='local'){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+    mem[k]=v; return true;
+  },
+  async del(k){
+    if(this.mode==='idb'){ try{ return await idb.del(k); }catch(e){ return false; } }
+    if(this.mode==='artifact'){ try{ await window.storage.delete(k,false); return true; }catch(e){ return false; } }
+    if(this.mode==='local'){ localStorage.removeItem(k); return true; }
+    delete mem[k]; return true;
+  },
+  saving(){ return this.mode!=='memory'; }
+};
+
+/* ============================================================
+   Themes — keys are kept so a saved choice still applies
+============================================================ */
+const THEMES={
+  concrete:{label:'Spruce',ground:'#EEF0EC',paper:'#FFFFFF',ink:'#1B2A24',ink70:'#566660',rule:'#D5DBD6',accent:'#2A6F4B',onAccent:'#FFFFFF',accentSoft:'#DDEEE4',link:'#1E5F8A',good:'#2A6F4B',onGood:'#FFFFFF',goodSoft:'#DDEEE4',warn:'#B5451B',onWarn:'#FFFFFF',warnSoft:'#FAE9E2',scrim:'rgba(27,42,36,.55)'},
+  midnight:{label:'Night',ground:'#10161C',paper:'#1A222B',ink:'#ECF1F4',ink70:'#A4B1BB',rule:'#2F3B46',accent:'#5CB88A',onAccent:'#10161C',accentSoft:'#23342C',link:'#7CC0EA',good:'#5CB88A',onGood:'#10161C',goodSoft:'#23342C',warn:'#F0A070',onWarn:'#10161C',warnSoft:'#3D2A1F',scrim:'rgba(0,0,0,.7)'},
+  crimson:{label:'Brick',ground:'#F3EFEC',paper:'#FFFFFF',ink:'#2B1F1B',ink70:'#6A5A55',rule:'#DDD3CE',accent:'#A3352B',onAccent:'#FFFFFF',accentSoft:'#F6E1DD',link:'#1E5F8A',good:'#2E6E4E',onGood:'#FFFFFF',goodSoft:'#DDEEE4',warn:'#A3352B',onWarn:'#FFFFFF',warnSoft:'#F6E1DD',scrim:'rgba(43,31,27,.55)'},
+  earth:{label:'Cedar',ground:'#F1ECE3',paper:'#FFFCF7',ink:'#2B241B',ink70:'#6B6254',rule:'#DED5C6',accent:'#8C5A2B',onAccent:'#FFFFFF',accentSoft:'#F1E3D2',link:'#1E5F8A',good:'#46703A',onGood:'#FFFFFF',goodSoft:'#E3EED9',warn:'#B5451B',onWarn:'#FFFFFF',warnSoft:'#FAE9E2',scrim:'rgba(43,36,27,.55)'}
+};
+
+/* ============================================================
+   Seed
+============================================================ */
+const PHASES=['Before closing','First week','First month','Before winter','Spring','Watch','Someday'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const SEASONS=[['Winter',[12,1,2],'Dec to Feb'],['Spring',[3,4,5],'Mar to May'],['Summer',[6,7,8],'Jun to Aug'],['Fall',[9,10,11],'Sep to Nov']];
+const seasonOf=m=>{ const x=SEASONS.find(([,ms])=>ms.includes(+m)); return x?x[0]:'Spring'; };
+const seasonMonths=n=>{ const x=SEASONS.find(([nm])=>nm===n); return x?x[1]:[]; };
+const currentSeason=()=>seasonOf(new Date().getMonth()+1);
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+const T_SEED=[
+['Well & septic','Ask seller for the last septic pump date','Before closing','','','Many counties require pumping every 3 years. If it is overdue, make it a closing-table item.'],
+['Fuel','Confirm fuel tank lease terms and level at transfer','Before closing','','','Who owns the tank, gallons at closing, delivery schedule, whether you can shop fuel.'],
+['Admin','Bind homeowner\u2019s insurance','Before closing','','',''],
+['Admin','Utilities transferred effective the closing date','Before closing','','','Electric, fuel, internet, trash.'],
+['Structure','Photograph every visible crack with a ruler in frame','Before closing','','','Baseline. Movement only shows by comparison.'],
+['Well & septic','Baseline well test: bacteria and nitrate','First week','','','Bacteria and nitrate yearly, arsenic at least once.'],
+['Safety','Rekey or replace every exterior lock','First week','','',''],
+['Safety','Smoke and CO detectors on every level','First week','','',''],
+['Safety','Fire extinguishers: kitchen, utility room, garage','First week','','',''],
+['Safety','Find and label the main water shutoff','First week','','','Utility closet or garage wall. Find it before you need it wet.'],
+['Safety','Label the breaker panel and the fuel shutoff','First week','','',''],
+['Mechanical','Measure the furnace filter and save the size','First week','','','Put it under Sizes on the House tab, then buy a six-pack.'],
+['Admin','Photograph every appliance model and serial number','First week','','',''],
+['Admin','Mail forwarded, address changed everywhere','First week','','','Bank, DMV, work, insurance, cards.'],
+['Admin','Trash and recycling service signed up','First week','','',''],
+['Well & septic','Get the water results explained in plain English','First month','','','Most state health departments have a free tool that reads the lab numbers for you.'],
+['Well & septic','Locate and permanently mark tank lids and drain field','First month','','','Before snow. Stake it so the plow does not find it for you.'],
+['Well & septic','Learn the well pump\u2019s normal cycle sound','First month','','','No meter and no water bill here, so a hidden leak shows up as a pump that will not stop cycling. That is your only alarm.'],
+['Well & septic','Sediment filter cartridges, measure the housing first','First month','','',''],
+['Well & septic','Save contacts: well driller, septic pumper, plumber','First month','','',''],
+['Structure','Walk the perimeter, grade should fall away from the house','First month','','','Standing water at the edge is the whole ballgame.'],
+['Structure','Check the expansion joint where siding meets concrete','First month','','',''],
+['Mechanical','Insulate or heat-tape water lines in unheated space','First month','','','Attic and garage runs freeze first.'],
+['Mechanical','Drain pan under the water heater','First month','','','No floor drain means a failed tank empties into the flooring.'],
+['Admin','Deed and title docs filed where you can find them','First month','','','Keep your own copies.'],
+['Admin','Written agreement on who pays for what','First month','','',''],
+['Admin','Property tax and insurance dates on a calendar','First month','','',''],
+['Tools','Extension ladder tall enough for the eaves','First month','','',''],
+['Tools','Shop vac, drill/driver, stud finder, level','First month','','',''],
+['Tools','Fasteners, caulk, expanding foam, tape assortment','First month','','',''],
+['Mechanical','Furnace tune-up before the first cold snap','Before winter','','','Book it in September.'],
+['Mechanical','Chimney or flue inspection if there is a fireplace','Before winter','','',''],
+['Mechanical','Programmable thermostat','Before winter','','',''],
+['Structure','Gutters cleaned, downspouts extended well past the concrete','Before winter','','',''],
+['Structure','Attic insulation depth checked and topped up','Before winter','','',''],
+['Winter','Hoses drained and hung, faucet covers on','Before winter','','',''],
+['Winter','Plow contract signed if you are not blowing it yourself','Before winter','','',''],
+['Winter','Driveway markers staked','Before winter','','','Keeps the plow off the lawn and the septic lid.'],
+['Winter','Roof rake','Before winter','','',''],
+['Winter','Ice melt and sand, a bucket by each door','Before winter','','',''],
+['Winter','Backup power plan for the well pump','Before winter','','','No power, no water. Decide portable vs. interlock before the outage.'],
+['Winter','Shovels, scraper, jumper cables in the garage','Before winter','','',''],
+['Yard','Mower','Spring','','',''],
+['Yard','Trimmer and leaf blower','Spring','','',''],
+['Yard','Hose and reel','Spring','','',''],
+['Someday','Water softener evaluation','Someday','','','Wait on the water test results first.'],
+['Someday','Measure windows for coverings','Someday','','',''],
+['Someday','Exterior and motion lighting','Someday','','',''],
+['Someday','Garage shelving or workbench','Someday','','','']
+];
+
+const Y_SEED=[
+[1,'Test smoke and CO detectors, fresh batteries','Safety','Annual',''],
+[1,'Check attic for frost or condensation on the sheathing','Structure','Annual',''],
+[3,'Well test: bacteria and nitrate','Well & septic','Annual',''],
+[4,'Walk the perimeter after thaw: grade, cracks, downspouts','Structure','Annual','Compare against last year\u2019s photos.'],
+[4,'AC or heat pump service','Mechanical','Annual',''],
+[5,'Septic visual inspection','Well & septic','Annual','Ponding over the drain field is the tell.'],
+[5,'Re-caulk the joint where siding meets concrete','Structure','Annual',''],
+[5,'Hose bibs back on, check for splits','Winter prep','Annual',''],
+[6,'Check well pressure tank charge and pump cycle time','Well & septic','Annual','Short cycling means a waterlogged tank or a leak.'],
+[7,'Keep grade sloped away from the well casing','Well & septic','Annual',''],
+[8,'Book the furnace tune-up and order fuel early','Mechanical','Annual','Pre-buy beats December pricing.'],
+[9,'Gutters cleaned, downspout extensions reset','Structure','Annual',''],
+[9,'Furnace tune-up','Mechanical','Annual',''],
+[10,'Winterize: hoses off, faucet covers, heat tape checked','Winter prep','Annual',''],
+[11,'Fuel tank topped, generator started and load-tested','Winter prep','Annual',''],
+[11,'Ice melt and sand restocked','Winter prep','Annual',''],
+[12,'Septic pumped','Well & septic','Every 3 years','Keep the report.'],
+[12,'Furnace filter changed','Mechanical','Quarterly','']
+];
+
+const E_SEED=[
+ {name:'Lawn mower',specs:[['Engine oil',''],['Oil capacity',''],['Spark plug',''],['Air filter',''],['Blade length',''],['Deck belt','']],
+  checks:[['Sharpen or replace the blade','Each spring'],['Change the oil','Annual or 50 hours'],['Air filter cleaned or replaced','Annual'],['Spark plug replaced','Annual'],['Deck cleaned underneath','Each spring'],['Tires, cables and belts checked','Each spring'],['Fuel stabilized or drained for storage','Each fall']]},
+ {name:'Snowblower',specs:[['Engine oil',''],['Oil capacity',''],['Spark plug',''],['Shear pins',''],['Auger belt',''],['Scraper bar',''],['Skid shoes','']],
+  checks:[['Fresh stabilized fuel','Each fall'],['Change the oil','Annual'],['Spark plug replaced','Annual'],['Spare shear pins on hand','Each fall'],['Auger and drive belts inspected','Annual'],['Scraper bar and skid shoes adjusted','Each fall'],['Chute and control cables working','Each fall'],['Run dry or stabilize before summer storage','Each spring']]}
+];
+
+const budgetSeed=()=>['Heating fuel','Electricity','Water and septic','Insurance','Property tax','Maintenance and repairs','Equipment and tools'].map((name,i)=>({id:uid(),name,planned:0,entries:[],_o:i}));
+function seed(){
+  return {
+    v:5, propertyName:'My house', theme:'concrete',
+    activeYear:new Date().getFullYear(), closedPhases:{},
+    tasks:T_SEED.map(([cat,title,when,contact,url,notes])=>({id:uid(),cat,title,when,contact,url,notes,cost:'',done:false,doneAt:null,photos:[]})),
+    yearly:Y_SEED.map(([month,title,cat,freq,notes])=>({id:uid(),season:seasonOf(month),month,title,cat,freq,notes})),
+    yearlyDone:{},
+    equipment:E_SEED.map(e=>({id:uid(),name:e.name,make:'',model:'',serial:'',
+      specs:e.specs.map(([k,v])=>({id:uid(),k,v})),
+      checks:e.checks.map(([title,freq])=>({id:uid(),title,freq}))})),
+    equipDone:{},
+    specs:[['Furnace filter',''],['Humidifier pad',''],['Well sediment filter',''],['Water heater element',''],['Fridge water filter','']].map(([k,v])=>({id:uid(),k,v})),
+    logs:[], photos:[],
+    contacts:[],
+    budget:budgetSeed(), buy:[]
+  };
+}
+
+/* ============================================================
+   App state
+============================================================ */
+let S=null, tab='list', filter='All', q='', seasonSel=currentSeason(), editing=false, slippedOpen=false,
+    openEquip=null, modal=null, photoCache={}, noteMsg='', noteKind='', modalAt=0,
+    draftContact={name:'',role:'',phone:''};
+
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- saving ---------- */
+const SAVE_FAIL='Could not save just now. Download a backup from the House tab to be safe.';
+let saveTimer=null, savePending=false;
+async function save(){
+  clearTimeout(saveTimer); saveTimer=null; savePending=false;
+  const ok=await store.set(KEY,JSON.stringify(S));
+  if(!ok) setNote(SAVE_FAIL);
+  else if(noteMsg===SAVE_FAIL) setNote('');
+  cloud.push();
+  return ok;
+}
+// Typing saves on a short delay so every keystroke is not a write.
+function saveSoon(){ savePending=true; clearTimeout(saveTimer); saveTimer=setTimeout(save,250); }
+function flushSave(){ if(savePending) save(); }
+window.addEventListener('pagehide',flushSave);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSave(); });
+
+function setNote(m,kind){ noteMsg=m; noteKind=kind||''; document.getElementById('note').innerHTML =
+  m?`<div class="note ${noteKind}">${esc(m)}${noteKind==='undo'
+      ?`<button class="undobtn" data-act="undo">Undo</button>`
+      :`<button class="icb" style="margin-left:auto" data-act="clearnote" aria-label="Dismiss">${I.x}</button>`}</div>`:''; }
+
+/* Deleting is one tap; an Undo bar gives ten seconds to take it back. */
+let undoCur=null, undoTimer=null;
+function deleted(what,undo,finalize){
+  clearTimeout(undoTimer);
+  const my={undo,finalize}; undoCur=my;
+  setNote('Deleted '+what+'.','undo');
+  undoTimer=setTimeout(()=>{ if(undoCur===my){ undoCur=null; if(my.finalize) my.finalize(); if(noteKind==='undo') setNote(''); } },10000);
+  render(); save();
+}
+
+/* ---------- photos ---------- */
+async function decode(file){
+  if(window.createImageBitmap){
+    try{ return await createImageBitmap(file); }catch(e){}
+  }
+  const url=await new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=()=>rej(new Error('could not read the file'));
+    r.readAsDataURL(file);
+  });
+  return await new Promise((res,rej)=>{
+    const i=new Image();
+    i.onload=()=>res(i);
+    i.onerror=()=>rej(new Error('could not decode the image'));
+    i.src=url;
+  });
+}
+async function compress(file,maxDim,quality){
+  const src=await decode(file);
+  const w=src.width, h=src.height;
+  if(!w||!h) throw new Error('image had no dimensions');
+  const sc=Math.min(1,maxDim/Math.max(w,h));
+  const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(w*sc));
+  c.height=Math.max(1,Math.round(h*sc));
+  const ctx=c.getContext('2d');
+  if(!ctx) throw new Error('no canvas support');
+  ctx.drawImage(src,0,0,c.width,c.height);
+  if(src.close) src.close();
+  const out=c.toDataURL('image/jpeg',quality);
+  if(!out || out.length<100) throw new Error('canvas produced nothing');
+  return out;
+}
+async function addPhoto(file,meta){
+  const id=uid();
+  const tries=[[1400,.72],[1000,.65],[700,.55],[480,.45]];
+  let data=null, lastErr='';
+  for(const [dim,q] of tries){
+    try{ data=await compress(file,dim,q); }
+    catch(e){ lastErr=e.message||'could not process the image'; data=null; break; }
+    if(cloud.code&&data.length>PHOTO_MAX){ lastErr='too big to share at '+Math.round(data.length/1024)+' KB'; continue; }
+    try{
+      const ok=await store.set(PKEY(id),data);
+      if(ok){ photoCache[id]=data; cloud.photoWritten(id,data); return finishPhoto(id,meta); }
+      lastErr='refused at '+Math.round(data.length/1024)+' KB';
+    }catch(e){ lastErr=(e&&e.message)||'storage error'; }
+  }
+  // separate key refused — keep the picture inside the main record instead
+  if(data){
+    try{
+      if(!S.photoData) S.photoData={};
+      S.photoData[id]=data;
+      photoCache[id]=data;
+      const ok=await store.set(KEY,JSON.stringify(S));
+      if(ok) return finishPhoto(id,meta,true);
+      delete S.photoData[id]; delete photoCache[id];
+      lastErr='the record is full';
+    }catch(e){ lastErr=(e&&e.message)||'storage error'; }
+  }
+  setNote('Photo not saved — '+lastErr+'.');
+  return null;
+}
+async function finishPhoto(id,meta,inline){
+  S.photos.unshift({id,caption:meta.caption||'',where:meta.where||'',inline:!!inline,
+    addedAt:new Date().toISOString().slice(0,16).replace('T',' ')});
+  await save();
+  setNote('');
+  return id;
+}
+const photoRetry={};
+async function loadPhotos(ids){
+  const now=Date.now();
+  const miss=(ids||[]).filter(i=>photoCache[i]===undefined||(photoCache[i]===null&&cloud.status==='on'&&now-(photoRetry[i]||0)>20000));
+  if(!miss.length) return false;
+  for(const id of miss){
+    if(S && S.photoData && S.photoData[id]){ photoCache[id]=S.photoData[id]; continue; }
+    let d=await store.get(PKEY(id));
+    if(!d){ photoRetry[id]=now; d=await cloud.fetchPhoto(id); }   // not on this phone yet: ask the house
+    photoCache[id]=d||null;
+  }
+  return true;
+}
+let pickCb=null;
+document.getElementById('picker').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value='';
+  if(f&&pickCb) await pickCb(f);
+  pickCb=null;
+});
+function pick(cb){ pickCb=cb; document.getElementById('picker').click(); }
+
+/* ============================================================
+   Sharing — Firebase Firestore
+   The phone always keeps a full local copy (the mirror), exactly as
+   before. With a house code set, every change is also pushed to the
+   house in Firestore, item by item, and other phones' changes are
+   pulled live. Nothing here runs until a code is entered.
+============================================================ */
+const FIREBASE_CONFIG={   // Troy's Firebase project; safe to ship, the security rules do the protecting
+  apiKey:"AIzaSyDuWePLZmzUb0P4bawNhklLlwdE0iFOIfw",
+  authDomain:"househq-44761.firebaseapp.com",
+  projectId:"househq-44761",
+  storageBucket:"househq-44761.firebasestorage.app",
+  messagingSenderId:"295347220513",
+  appId:"1:295347220513:web:64b0c9d25c47fe89ee3360"
+};
+const FIREBASE_SDK='12.17.1';
+const LS=(k,v)=>{ try{ if(v===undefined) return localStorage.getItem(k); if(v===null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){ return null; } };
+const SYNC_KEY='hq:synced', PEND_KEY='hq:pendingphotos';
+const SHARED_COLS=['tasks','yearly','equipment','logs','photos','contacts','specs','budget','buy'];
+const CHECK_MAPS=['yearlyDone','equipDone'];
+const META_FIELDS=['propertyName','closedPhases','lastBackup','createdAt'];
+const clone=o=>JSON.parse(JSON.stringify(o));
+const PHOTO_MAX=1000000;   // Firestore documents top out at 1 MB
+let pendingRender=false;
+
+function fbReady(ms){
+  return new Promise(res=>{
+    const go=()=>timeout(window.loadFB(),ms).then(res,()=>res(null));
+    if(window.loadFB) go(); else window.addEventListener('fbloader',go,{once:true});
+    setTimeout(()=>res(null),ms+500);
+  });
+}
+function sortCol(col,arr){
+  const o=x=>x._o??0;
+  if(col==='logs') return arr.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||o(b)-o(a));
+  if(col==='photos') return arr.sort((a,b)=>(b.addedAt||'').localeCompare(a.addedAt||'')||o(b)-o(a));
+  return arr.sort((a,b)=>o(a)-o(b));
+}
+function friendlyErr(e){
+  const c=(e&&(e.code||e.message)||'')+'';
+  if(/permission-denied/.test(c)) return 'Firestore is refusing access. Check the security rules from the setup steps.';
+  if(/operation-not-allowed|admin-restricted/.test(c)) return 'Anonymous sign-in is not switched on in Firebase Authentication.';
+  if(/api-key|invalid-api-key|project/.test(c)) return 'The Firebase config does not look right.';
+  if(/unavailable|network|offline|Failed to fetch/.test(c)) return 'No connection right now.';
+  return (e&&e.message)||'something went wrong';
+}
+/* What changed locally since the last sync, as Firestore writes. */
+function diffState(cur,prev){
+  const ops=[]; const first=!prev;
+  for(const c of SHARED_COLS){
+    const a=cur[c]||[], b=prev?(prev[c]||[]):[];
+    const bm=new Map(b.map(x=>[x.id,JSON.stringify(x)])), seen=new Set();
+    a.forEach((x,i)=>{
+      if(x._o==null) x._o=first?i:Date.now()+i;
+      seen.add(x.id);
+      if(bm.get(x.id)!==JSON.stringify(x)) ops.push({col:c,id:x.id,data:clone(x)});
+    });
+    for(const id of bm.keys()) if(!seen.has(id)) ops.push({col:c,id,data:null});
+  }
+  for(const m of CHECK_MAPS){
+    const a=cur[m]||{}, b=prev?(prev[m]||{}):{};
+    for(const k in a) if(!b[k]) ops.push({col:m,id:k,data:{v:1}});
+    for(const k in b) if(!a[k]) ops.push({col:m,id:k,data:null});
+  }
+  const meta={}; let mc=false;
+  for(const f of META_FIELDS){
+    const av=cur[f]===undefined?null:cur[f], bv=prev?(prev[f]===undefined?null:prev[f]):undefined;
+    if(JSON.stringify(av)!==JSON.stringify(bv)){ meta[f]=av; mc=true; }
+  }
+  return {ops,meta:mc?meta:null};
+}
+function applyToSynced(ls,op){
+  if(CHECK_MAPS.includes(op.col)){ ls[op.col]=ls[op.col]||{}; if(op.data) ls[op.col][op.id]=1; else delete ls[op.col][op.id]; return; }
+  const arr=ls[op.col]=ls[op.col]||[]; const i=arr.findIndex(x=>x.id===op.id);
+  if(op.data){ if(i>=0) arr[i]=op.data; else arr.push(op.data); } else if(i>=0) arr.splice(i,1);
+}
+function emptyShell(base){
+  const s={...(base||{}),photoData:{}};
+  for(const c of SHARED_COLS) s[c]=[];
+  for(const m of CHECK_MAPS) s[m]={};
+  s.closedPhases={};
+  return s;
+}
+
+const cloud={
+  status:'off',   // off | loading | connecting | on | error
+  code:LS('hq:house')||'', config:null, FB:null, db:null, unsubs:[], err:'',
+  lastSynced:null, pendingPhotos:new Set(), pushing:false, pushAgain:false, pullT:null,
+  hasConfig(){ return !!(FIREBASE_CONFIG||this.config); },
+  parseConfig(text){
+    const o={}, re=/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g; let m;
+    while((m=re.exec(text||''))) o[m[1]]=m[2];
+    return (o.apiKey&&o.projectId&&o.appId)?o:null;
+  },
+  async init(){
+    try{ this.config=FIREBASE_CONFIG||JSON.parse(LS('hq:fbconfig')||'null'); }catch(e){ this.config=null; }
+    try{ const r=await store.get(SYNC_KEY); this.lastSynced=r?JSON.parse(r):null; }catch(e){ this.lastSynced=null; }
+    try{ this.pendingPhotos=new Set(JSON.parse(await store.get(PEND_KEY)||'[]')); }catch(e){}
+    if(this.code&&this.hasConfig()) this.connect();
+  },
+  ref(col,id){ const FB=this.FB; return col==='meta'?FB.doc(this.db,'houses',this.code):FB.doc(this.db,'houses',this.code,col,id); },
+  colRef(col){ return this.FB.collection(this.db,'houses',this.code,col); },
+  async connect(){
+    if(this.status==='loading'||this.status==='connecting'||this.status==='on') return;
+    this.status='loading'; this.err=''; this.paint();
+    const FB=await fbReady(12000);
+    if(!FB){ this.status='error'; this.err='Could not load the sync service. Working from this phone until it can.'; this.paint(); return; }
+    try{
+      this.status='connecting'; this.FB=FB;
+      const app=FB.getApps().length?FB.getApp():FB.initializeApp(this.config);
+      try{ this.db=FB.initializeFirestore(app,{localCache:FB.persistentLocalCache({cacheSizeBytes:FB.CACHE_SIZE_UNLIMITED})}); }
+      catch(e){ this.db=FB.getFirestore(app); }
+      await FB.signInAnonymously(FB.getAuth(app));
+      if(!this.lastSynced){
+        const snap=await FB.getDoc(this.ref('meta'));
+        if(snap.exists()){
+          // Joining a house that already exists: this phone takes the house's data.
+          S=emptyShell(S); this.lastSynced=clone(S);
+          await store.set(KEY,JSON.stringify(S));
+        }else{
+          // A brand-new house: what is on this phone becomes the house.
+          await this.pushAll();
+        }
+      }
+      this.status='on'; this.paint();
+      this.listen();
+      this.flushPhotos();
+      this.push();
+    }catch(e){ this.status='error'; this.err=friendlyErr(e); this.paint(); }
+  },
+  async pushAll(){
+    const {ops,meta}=diffState(S,null);
+    await this.commit(ops,meta);
+    this.lastSynced=clone(S);
+    await store.set(SYNC_KEY,JSON.stringify(this.lastSynced));
+    S.photos.forEach(p=>this.pendingPhotos.add(p.id));
+    await store.set(PEND_KEY,JSON.stringify([...this.pendingPhotos]));
+  },
+  async commit(ops,meta){
+    const FB=this.FB; let batch=FB.writeBatch(this.db), n=0;
+    const flush=async()=>{ if(n){ await batch.commit(); batch=FB.writeBatch(this.db); n=0; } };
+    for(const op of ops){
+      const r=this.ref(op.col,op.id);
+      if(op.data) batch.set(r,op.data); else batch.delete(r);
+      if(++n>=400) await flush();
+    }
+    if(meta){ batch.set(this.ref('meta'),clone(meta),{merge:true}); n++; }
+    await flush();
+  },
+  async push(){
+    if(this.status!=='on') return;
+    if(this.pushing){ this.pushAgain=true; return; }
+    this.pushing=true;
+    try{
+      const {ops,meta}=diffState(S,this.lastSynced);
+      if(ops.length||meta){
+        await this.commit(ops,meta);
+        for(const op of ops) applyToSynced(this.lastSynced,op);
+        if(meta) Object.assign(this.lastSynced,clone(meta));
+        await store.set(SYNC_KEY,JSON.stringify(this.lastSynced));
+        if(noteMsg.startsWith('Sync hiccup')) setNote('');
+      }
+    }catch(e){ this.err=friendlyErr(e); setNote('Sync hiccup: '+this.err); }
+    this.pushing=false;
+    if(this.pushAgain){ this.pushAgain=false; this.push(); }
+  },
+  listen(){
+    const FB=this.FB;
+    for(const c of [...SHARED_COLS,...CHECK_MAPS])
+      this.unsubs.push(FB.onSnapshot(this.colRef(c),snap=>this.onCol(c,snap.docs.map(d=>({id:d.id,data:d.data()}))),e=>{ this.err=friendlyErr(e); this.paint(); }));
+    this.unsubs.push(FB.onSnapshot(this.ref('meta'),snap=>this.onMeta(snap.exists()?snap.data():{}),e=>{ this.err=friendlyErr(e); this.paint(); }));
+  },
+  /* Three-way merge per item: anything changed on this phone since the last sync wins here and gets pushed;
+     everything else takes the house's version. */
+  onCol(col,docs){
+    const ls=this.lastSynced;
+    if(CHECK_MAPS.includes(col)){
+      const server=new Set(docs.map(d=>d.id)), prev=new Set(Object.keys(ls[col]||{})), local=S[col]||{}, out={};
+      for(const k of server){ if(!(k in local)&&prev.has(k)) continue; out[k]=local[k]||1; }
+      for(const k in local) if(!server.has(k)&&!prev.has(k)) out[k]=local[k];
+      S[col]=out; ls[col]=Object.fromEntries([...server].map(k=>[k,1]));
+    }else{
+      const server=new Map(docs.map(d=>[d.id,d.data]));
+      const prev=new Map((ls[col]||[]).map(x=>[x.id,JSON.stringify(x)]));
+      const local=new Map((S[col]||[]).map(x=>[x.id,x])), out=[];
+      for(const [id,sd] of server){
+        const l=local.get(id), p=prev.get(id);
+        if(!l){ if(!p) out.push(sd); continue; }
+        out.push(JSON.stringify(l)!==p?l:sd);
+      }
+      for(const [id,l] of local) if(!server.has(id)&&!prev.has(id)) out.push(l);
+      S[col]=sortCol(col,out); ls[col]=[...server.values()].map(clone);
+    }
+    this.afterPull();
+  },
+  onMeta(data){
+    const ls=this.lastSynced;
+    for(const f of META_FIELDS){
+      const pending=JSON.stringify(S[f]===undefined?null:S[f])!==JSON.stringify(ls[f]===undefined?null:ls[f]);
+      if(!pending&&data[f]!==undefined) S[f]=clone(data[f]);
+      if(data[f]!==undefined) ls[f]=clone(data[f]);
+    }
+    if(!S.closedPhases) S.closedPhases={};
+    this.afterPull();
+  },
+  afterPull(){
+    clearTimeout(this.pullT);
+    this.pullT=setTimeout(async()=>{
+      await store.set(KEY,JSON.stringify(S));
+      await store.set(SYNC_KEY,JSON.stringify(this.lastSynced));
+      const ae=document.activeElement, typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+      if((modal&&modal.draft)||typing) pendingRender=true; else render();
+      this.push();
+    },60);
+  },
+  /* photos: the picture itself lives in its own document, fetched only when shown */
+  async photoWritten(id,data){
+    if(!this.code) return;
+    this.pendingPhotos.add(id); await store.set(PEND_KEY,JSON.stringify([...this.pendingPhotos]));
+    this.flushPhotos();
+  },
+  async flushPhotos(){
+    if(this.status!=='on'||!this.pendingPhotos.size) return;
+    for(const id of [...this.pendingPhotos]){
+      try{
+        const data=photoCache[id]||(S.photoData&&S.photoData[id])||await store.get(PKEY(id));
+        if(data&&data.length<=PHOTO_MAX) await this.FB.setDoc(this.ref('photodata',id),{d:data});
+        this.pendingPhotos.delete(id);
+      }catch(e){ this.err=friendlyErr(e); break; }
+    }
+    await store.set(PEND_KEY,JSON.stringify([...this.pendingPhotos]));
+  },
+  async fetchPhoto(id){
+    if(this.status!=='on') return null;
+    try{ const s=await this.FB.getDoc(this.ref('photodata',id)); const d=s.exists()?s.data().d:null;
+      if(d) await store.set(PKEY(id),d); return d||null; }
+    catch(e){ return null; }
+  },
+  deletePhoto(id){ if(this.status==='on'){ try{ this.FB.deleteDoc(this.ref('photodata',id)); }catch(e){} } },
+  async disconnect(){
+    for(const u of this.unsubs){ try{ u(); }catch(e){} } this.unsubs=[];
+    this.status='off'; this.code=''; this.lastSynced=null; this.err='';
+    LS('hq:house',null); await store.del(SYNC_KEY);
+    this.paint();
+  },
+  describe(){
+    if(!this.code) return 'Just this phone. Nothing is shared.';
+    if(this.status==='on') return 'Sharing is live. Changes reach the other phones within a second or two, and pile up here when there is no signal.';
+    if(this.status==='loading'||this.status==='connecting') return 'Connecting…';
+    if(this.status==='error') return 'Not connected: '+this.err+' Everything is still saved on this phone and will sync when it connects.';
+    return 'Not connected yet.';
+  },
+  paint(){ if(tab==='house'&&!modal) render(); }
+};
+document.addEventListener('focusout',()=>{ if(pendingRender&&!(modal&&modal.draft)){ pendingRender=false; setTimeout(render,80); } });
+
+/* ---------- derived ---------- */
+const yearKey=(id,y)=>id+':'+y;
+const isClosed=p=>!!(S.closedPhases&&S.closedPhases[p]);
+const activePhases=()=>PHASES.filter(p=>!isClosed(p));
+const visibleTasks=()=>S.tasks.filter(t=>!isClosed(t.when));
+// The setup checklist is a one-time job. Once every stage that has items is closed out, its tab goes away.
+const setupOpen=()=>S.tasks.some(t=>!isClosed(t.when));
+const closedList=()=>Object.keys(S.closedPhases||{}).filter(p=>S.tasks.some(t=>t.when===p));
+/* "Every 3 years" style items are only due in the year they come round. */
+function freqInfo(freq){
+  const f=(freq||'').toLowerCase(); let m;
+  if((m=f.match(/every\s+(\d+)\s*(year|yr)/))) return {years:+m[1]};
+  if(/every other year|biennial/.test(f)) return {years:2};
+  if((m=f.match(/every\s+(\d+)\s*month/))) return {months:+m[1]};
+  if(/quarter/.test(f)) return {months:3};
+  if(/month/.test(f)) return {months:1};
+  if(/week/.test(f)) return {weeks:1};
+  return {years:1};
+}
+function lastDoneBefore(id,y){
+  const ys=Object.keys(S.yearlyDone).filter(k=>k.startsWith(id+':')).map(k=>+k.split(':').pop()).filter(v=>v<y);
+  return ys.length?Math.max(...ys):null;
+}
+function nextDueYear(x,y){
+  const fi=freqInfo(x.freq); if(!fi.years||fi.years<2) return null;
+  const last=lastDoneBefore(x.id,y); return last?last+fi.years:null;
+}
+const dueInYear=(x,y)=>{ if(S.yearlyDone[yearKey(x.id,y)]) return true; const n=nextDueYear(x,y); return n===null||n<=y; };
+const seasonalDone=y=>S.yearly.filter(x=>S.yearlyDone[yearKey(x.id,y)]).length;
+const seasonalTotal=y=>S.yearly.filter(x=>dueInYear(x,y)).length;
+function completePhases(){
+  return activePhases().filter(p=>{
+    const r=S.tasks.filter(t=>t.when===p);
+    return r.length && r.every(t=>t.done);
+  });
+}
+function yearsTouched(){
+  const set=new Set([S.activeYear,new Date().getFullYear()]);
+  Object.keys(S.yearlyDone).forEach(k=>set.add(+k.split(':').pop()));
+  Object.keys(S.equipDone).forEach(k=>set.add(+k.split(':').pop()));
+  return [...set].sort((a,b)=>a-b);
+}
+function lastDoneYear(id){
+  const ys=Object.keys(S.yearlyDone).filter(k=>k.startsWith(id+':')).map(k=>+k.split(':').pop());
+  return ys.length?Math.max(...ys):null;
+}
+
+/* ============================================================
+   Render
+============================================================ */
+const HEAD="'Barlow Condensed',Barlow,system-ui,-apple-system,sans-serif";
+const BODY="Barlow,system-ui,-apple-system,sans-serif";
+const chevron=c=>`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='${c.replace('#','%23')}' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`;
+
+const CSS = t => `*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:${t.ground};color:${t.ink}}
+html,body{margin:0;padding:0}
+body{
+  background-color:${t.ground};color:${t.ink};
+  font:400 15.5px/1.5 ${BODY};
+  padding-bottom:calc(84px + env(safe-area-inset-bottom));
+}
+.cond{font-family:${HEAD}}
+/* containers paint their own background so a forced dark mode can't show through */
+.wrap{max-width:580px;margin:0 auto;min-height:100vh;color:${t.ink};background-color:${t.ground}}
+main#view{background-color:${t.ground};color:${t.ink}}
+.grp,.row,.chips,.specrow,.btns,.themes,.strip,.log,.kv{background-color:transparent}
+button{font:inherit;cursor:pointer;color:inherit}
+input,textarea,select{
+  font:400 16px ${BODY};background:${t.paper};
+  border:1.5px solid ${t.rule};color:${t.ink};-webkit-text-fill-color:${t.ink};
+  padding:11px 12px;width:100%;border-radius:10px;appearance:none;min-height:46px;
+}
+select{background-image:${chevron(t.ink70)};background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+textarea{line-height:1.4;resize:vertical}
+input:focus,textarea:focus,select:focus{border-color:${t.accent};outline:none;box-shadow:0 0 0 3px ${t.accentSoft}}
+input::placeholder,textarea::placeholder{color:${t.ink70};-webkit-text-fill-color:${t.ink70};opacity:.8}
+button{color:${t.ink}}
+.btn{color:${t.ink}}
+.btn.solid{color:${t.onAccent};-webkit-text-fill-color:${t.onAccent}}
+.btn.dark{color:${t.paper};-webkit-text-fill-color:${t.paper}}
+nav button.on{color:${t.accent};-webkit-text-fill-color:${t.accent}}
+input[type=file]{display:none}
+:focus-visible{outline:3px solid ${t.link};outline-offset:2px}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
+a{color:${t.link}}
+
+/* header */
+header{padding:14px 18px 12px;border-bottom:1px solid ${t.rule};background:${t.paper}}
+.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.hname{font:700 28px/1.05 ${HEAD};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hsub{font-size:13px;color:${t.ink70};margin-top:3px}
+.hstat{text-align:right;line-height:1;flex-shrink:0}
+.hstat b{font:700 32px ${HEAD};display:block;color:${t.accent}}
+.hstat span{font-size:12.5px;color:${t.ink70}}
+.gauge{display:flex;gap:3px;align-items:flex-end;height:22px;margin:12px 0 0}
+.gauge i{flex:1;background:${t.rule};border-radius:2px 2px 0 0;transition:background .18s}
+.gauge i.on{background:${t.good}}
+.seasons{display:flex;gap:6px;margin:12px 0 0}
+.seasons:empty{display:none}
+.seasons button{flex:1;display:grid;justify-items:center;gap:1px;font:700 14px ${HEAD};letter-spacing:.03em;
+  background:${t.ground};color:${t.ink70};padding:6px 0 5px;border-radius:10px;border:1.5px solid ${t.rule};position:relative}
+.seasons button small{font:500 11.5px ${BODY};letter-spacing:0;opacity:.85}
+.seasons button.on{background:${t.accent};color:${t.onAccent};border-color:${t.accent}}
+.seasons button.now::after{content:'';position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:${t.accent}}
+.seasons button.on.now::after{background:${t.onAccent}}
+
+/* structure */
+.pad{padding:16px 18px 30px}
+h2.sec{font:700 22px/1.15 ${HEAD};margin:28px 0 8px;display:flex;align-items:baseline;gap:9px}
+h2.sec:first-child{margin-top:0}
+h2.sec em{font-style:normal;font-size:13px;font-weight:500;color:${t.ink70};font-family:${BODY}}
+.hint{color:${t.ink70};font-size:14px;margin:0 0 12px;line-height:1.5;max-width:60ch}
+.grp{margin-bottom:22px}
+.grp>h3{font:700 18px ${HEAD};margin:0 0 4px;padding-bottom:6px;
+  border-bottom:1px solid ${t.rule};display:flex;justify-content:space-between;align-items:baseline}
+.grp>h3 span{font:500 13px ${BODY};color:${t.ink70}}
+
+.row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid ${t.rule}}
+.row:last-child{border-bottom:0}
+.row .body{flex:1;min-width:0;background:none;border:0;text-align:left;padding:0}
+.row .t{font-weight:500;line-height:1.35}
+.row .m{font-size:12.5px;color:${t.ink70};margin-top:2px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.done .t{text-decoration:line-through;color:${t.ink70}}
+
+.box{width:26px;height:26px;flex:0 0 26px;margin-top:1px;border:2px solid ${t.ink70};border-radius:7px;
+  background:${t.paper};display:grid;place-items:center;padding:0;transition:background .12s,border-color .12s}
+.box.on{background:${t.good};border-color:${t.good};color:${t.onGood}}
+.box svg{display:block}
+
+.card{background:${t.paper};border:1px solid ${t.rule};border-radius:12px;margin-bottom:12px;overflow:hidden}
+.card>summary,.card>.head{padding:14px;display:flex;justify-content:space-between;
+  align-items:center;gap:10px;background:none;border:0;width:100%;cursor:pointer;min-height:52px}
+.card .head b{font:700 20px ${HEAD}}
+.card .head i{font-style:normal;font-size:13px;color:${t.ink70}}
+.card .inner{padding:0 14px 16px}
+
+.btn{background:${t.paper};border:1.5px solid ${t.rule};border-radius:10px;padding:11px 12px;font-size:15px;
+  font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:46px}
+.btn.solid{background:${t.accent};color:${t.onAccent};border-color:${t.accent};
+  font:700 17px ${HEAD};letter-spacing:.02em;padding:13px}
+.btn.dark{background:${t.ink};color:${t.paper};border-color:${t.ink}}
+.btn.danger{color:${t.warn};border-color:${t.warnSoft};background:${t.warnSoft}}
+.btn.dash{border-style:dashed;background:transparent}
+.editbtn{width:auto;flex:0 0 auto;padding:0 14px}
+.editbtn.on{background:${t.accentSoft};border-color:${t.accent};color:${t.accent}}
+.btn:active{filter:brightness(.94)}
+.btns{display:grid;gap:8px;margin-top:10px}
+.btns.h{grid-auto-flow:column;grid-auto-columns:1fr}
+.icb{background:none;border:0;color:${t.ink70};padding:6px;line-height:0;border-radius:8px;
+  min-width:32px;min-height:32px;display:inline-grid;place-items:center}
+
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;padding:7px 13px;font:600 14px ${HEAD};border-radius:999px;
+  border:1.5px solid ${t.rule};background:${t.paper};color:${t.ink70}}
+.chip.on{background:${t.accent};border-color:${t.accent};color:${t.onAccent}}
+
+.tag{border-radius:6px;padding:2px 8px;font:600 12.5px ${HEAD};white-space:nowrap;background:${t.accentSoft};color:${t.accent}}
+.tag.warn{background:${t.warnSoft};color:${t.warn}}
+.tag.link{background:${t.ground};color:${t.link}}
+
+.strip{display:flex;gap:8px;overflow-x:auto;padding:6px 0}
+.strip button{width:76px;height:76px;flex:0 0 76px;border:1px solid ${t.rule};border-radius:10px;
+  background:${t.ground};padding:0;overflow:hidden;display:grid;place-items:center;color:${t.ink70}}
+.strip img{width:100%;height:100%;object-fit:cover;display:block}
+
+.log{margin-top:10px;border-left:3px solid ${t.accentSoft};padding-left:12px}
+.log .e{margin-bottom:11px}
+.log .d{font:700 15px ${HEAD};display:flex;gap:8px;align-items:baseline}
+.log .d em{font:500 12.5px ${BODY};font-style:normal;color:${t.ink70}}
+.log .w{font-size:14px;line-height:1.4}
+.log .meta{font-size:12.5px;color:${t.ink70};margin-top:2px}
+
+.specrow{display:flex;gap:6px;margin-bottom:8px;align-items:center}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:15px;margin:0}
+.kv dt{color:${t.ink70}}
+.kv dd{margin:0;font-weight:500}
+
+.addbox{display:grid;gap:8px;margin-top:12px;padding:12px;border:1.5px dashed ${t.rule};border-radius:12px}
+.themes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tbtn{display:flex;align-items:center;gap:10px;background:${t.paper};color:${t.ink};
+  border:1.5px solid ${t.rule};border-radius:10px;padding:11px 12px;font-weight:600;text-align:left;min-height:46px}
+.tbtn.on{border-color:${t.accent};box-shadow:0 0 0 2px ${t.accentSoft}}
+.sw{display:flex;flex:0 0 auto;border:1px solid ${t.rule};border-radius:6px;overflow:hidden}
+.sw i{width:13px;height:20px;display:block}
+
+.banner{background:${t.accentSoft};color:${t.ink};padding:14px;margin-bottom:16px;border-radius:12px;border-left:4px solid ${t.accent}}
+.banner b{font:700 19px ${HEAD};display:block;margin-bottom:3px}
+.banner p{margin:0 0 10px;font-size:13.5px;line-height:1.45;color:${t.ink70}}
+.banner .btn{background:${t.paper};border-color:${t.accent};color:${t.accent}}
+.note{background:${t.warnSoft};color:${t.warn};padding:10px 18px;font-size:14px;font-weight:500;display:flex;gap:8px;align-items:center}
+.note .icb{color:${t.warn}}
+.note.ok{background:${t.goodSoft};color:${t.good}}
+.note.ok .icb{color:${t.good}}
+#note{position:sticky;top:0;z-index:50}
+.note.undo{background:${t.ink};color:${t.paper}}
+.undobtn{margin-left:auto;background:${t.paper};color:${t.ink};border:0;border-radius:8px;padding:6px 14px;font-weight:700;font-size:14px;flex:0 0 auto}
+.box.soft{background:${t.goodSoft};border-color:${t.goodSoft};color:${t.good}}
+.notdue .t{color:${t.ink70}}
+.bar{height:8px;border-radius:4px;background:${t.rule};overflow:hidden;width:100%}
+.bar i{display:block;height:100%;background:${t.accent};border-radius:4px;transition:width .2s}
+.bar i.over{background:${t.warn}}
+.linkbtn{background:none;border:0;padding:0;color:${t.link};font:600 13px ${BODY};text-decoration:underline}
+.prow{align-items:flex-start}
+.thumb{width:76px;height:76px;flex:0 0 76px;border:1px solid ${t.rule};border-radius:10px;background:${t.ground};
+  padding:0;overflow:hidden;display:grid;place-items:center;color:${t.ink70}}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.viewer.cmp{display:grid;grid-template-rows:1fr 1fr;gap:10px;padding:52px 12px calc(12px + env(safe-area-inset-bottom))}
+.pane{display:grid;grid-template-rows:1fr auto;min-height:0;gap:4px}
+.pane img{width:100%;height:100%;min-height:0;object-fit:contain;border-radius:8px}
+.pane .cap{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#fff;font-size:13px}
+.pane .cap span{flex:1;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pane .cap button{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:8px;padding:8px 12px;line-height:0}
+.pane .cap button[disabled]{opacity:.3}
+.cmpx{position:absolute;top:12px;right:12px;color:#fff}
+
+/* year bar */
+.yearbar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border:1px solid ${t.rule};border-radius:12px;background:${t.paper};padding:8px 10px;margin-bottom:14px}
+.yearbar b{font:700 26px ${HEAD};line-height:1}
+.yearbar small{display:block;font-size:12px;color:${t.ink70};font-weight:500}
+.yearbar button{background:${t.ground};border:1px solid ${t.rule};border-radius:8px;padding:9px 11px;line-height:0}
+.yearbar button[disabled]{opacity:.3}
+
+
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;background:${t.paper};border-top:1px solid ${t.rule};
+  display:flex;max-width:580px;margin:0 auto;padding:4px 4px calc(4px + env(safe-area-inset-bottom));z-index:20}
+nav button{flex:1;border:0;background:none;color:${t.ink70};padding:8px 2px 6px;border-radius:10px;min-height:52px;
+  display:grid;justify-items:center;gap:3px;font-size:11.5px;font-weight:600}
+nav button.on{background:${t.accentSoft};color:${t.accent}}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:${t.scrim};z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:${t.paper};width:100%;max-width:580px;max-height:88vh;overflow-y:auto;
+  padding:12px 18px calc(18px + env(safe-area-inset-bottom));border-radius:18px 18px 0 0}
+.sheet:before{content:'';display:block;width:38px;height:4px;border-radius:2px;background:${t.rule};margin:0 auto 12px}
+.sheet h3{font:700 22px/1.15 ${HEAD};margin:0}
+.sheet .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.sheet .auto{font-size:12.5px;color:${t.ink70};margin-top:3px}
+.sheet .fields{display:grid;gap:10px}
+.lbl{display:grid;gap:4px;font-size:12.5px;color:${t.ink70}}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:60;display:grid;place-items:center;padding:16px}
+.viewer img{max-width:100%;max-height:100%;border-radius:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}`;
+
+
+function applyTheme(){
+  const t=THEMES[S.theme]||THEMES.concrete;
+  document.getElementById('sty').textContent=CSS(t);
+  for(const k in t) if(k!=='label') document.documentElement.style.setProperty('--'+k,t[k]);
+  const cs = S.theme==='midnight' ? 'dark' : 'light';
+  document.documentElement.style.colorScheme=cs;
+  const m=document.querySelector('meta[name="color-scheme"]');
+  if(m) m.content=cs;
+  const tc=document.getElementById('themecolor');
+  if(tc) tc.content=t.paper;
+}
+
+function renderHeader(){
+  const setup=setupOpen();
+  let done,total;
+  if(setup){ const vis=visibleTasks(); done=vis.filter(t=>t.done).length; total=vis.length; }
+  else { done=seasonalDone(S.activeYear); total=seasonalTotal(S.activeYear); }
+  document.getElementById('hname').textContent=S.propertyName||'House HQ';
+  const tabLabel=(TABS.find(([k])=>k===tab)||[])[1]||'';
+  document.getElementById('hsub').textContent=tabLabel;
+  document.getElementById('hdone').textContent=done;
+  document.getElementById('htotal').textContent='of '+total;
+  const ticks=Math.max(Math.min(total,58),1), fill=Math.round(done/Math.max(total,1)*ticks);
+  document.getElementById('gauge').innerHTML=Array.from({length:ticks},(_,i)=>
+    `<i class="${i<fill?'on':''}" style="height:${i%5===0?22:12}px"></i>`).join('');
+  const cur=currentSeason(), y=S.activeYear;
+  document.getElementById('seasons').innerHTML=tab!=='seasons'?'':SEASONS.map(([n])=>{
+    const rows=S.yearly.filter(x=>x.season===n&&dueInYear(x,y)), d=rows.filter(x=>S.yearlyDone[yearKey(x.id,y)]).length;
+    return `<button class="${n===seasonSel?'on':''} ${n===cur?'now':''}" data-act="pickseason" data-v="${n}" aria-pressed="${n===seasonSel}">${n}<small>${rows.length?d+'/'+rows.length:'—'}</small></button>`;
+  }).join('');
+}
+
+function checkbox(on,act,data){
+  return `<button class="box ${on?'on':''}" data-act="${act}" ${data} aria-label="toggle">${on?I.check:''}</button>`;
+}
+function stripHTML(ids){
+  if(!ids||!ids.length) return '';
+  return `<div class="strip">${ids.map(id=>{
+    const src=photoCache[id];
+    return `<button data-act="viewphoto" data-id="${id}">${src?`<img src="${src}" alt="">`:I.img}</button>`;
+  }).join('')}</div>`;
+}
+function logHTML(logs,showSubject){
+  if(!logs.length) return '';
+  return `<div class="log">${logs.map(l=>`<div class="e">
+    <div class="d">${esc(l.date)}${l.who?`<em>${esc(l.who)}</em>`:''}
+      <button class="icb" style="margin-left:auto" data-act="dellog" data-id="${l.id}">${I.trash}</button></div>
+    ${showSubject?`<div class="w"><b>${esc(l.subject)}</b></div>`:''}
+    ${l.what?`<div class="w">${esc(l.what)}</div>`:''}
+    ${(l.cost||l.doc)?`<div class="meta">${l.cost?'$'+esc(l.cost):''}${l.cost&&l.doc?' · ':''}${l.doc?esc(l.doc):''}</div>`:''}
+    ${stripHTML(l.photos)}</div>`).join('')}</div>`;
+}
+
+/* ---------- All items ---------- */
+function viewList(){
+  const rows=visibleTasks().filter(t=>{
+    const okP=filter==='All'||t.when===filter;
+    const ql=q.trim().toLowerCase();
+    return okP && (!ql||(t.title+t.cat+t.notes).toLowerCase().includes(ql));
+  });
+  const groups={}; rows.forEach(t=>(groups[t.when]=groups[t.when]||[]).push(t));
+
+  const ready=completePhases();
+  let banner='';
+  if(ready.length){
+    banner=`<div class="banner">
+      <b>${ready.length===1?esc(ready[0])+' is fully checked.':'Some stages are fully checked.'}</b>
+      <p>Close a stage out and it drops off the list and the filters. Bring it back any time from the House tab.</p>
+      <div class="btns">${ready.map(p=>
+        `<button class="btn" data-act="closeout" data-v="${esc(p)}">${I.check} Close out ${esc(p)}</button>`).join('')}</div>
+    </div>`;
+  }
+
+  return `${banner}
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <input id="q" placeholder="Search items" value="${esc(q)}">
+    <button class="btn dark" style="width:50px;flex:0 0 50px;padding:0" data-act="newtask" aria-label="Add an item">${I.plus}</button>
+    <button class="btn editbtn ${editing?'on':''}" data-act="edit">${editing?'Done':'Edit'}</button>
+  </div>
+  <button class="btn dash" style="margin-bottom:14px" data-act="snap">${I.cam} Snap something to look at later</button>
+  <div class="chips">${['All',...activePhases()].map(p=>
+    `<button class="chip ${filter===p?'on':''}" data-act="filter" data-v="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+  ${rows.length?'':'<p class="hint">Nothing matches. Clear the search, or add it as a new item.</p>'}
+  ${activePhases().filter(p=>groups[p]).map(p=>`
+    <section class="grp"><h3>${esc(p)}<span>${groups[p].filter(t=>!t.done).length} open</span></h3>
+    ${groups[p].map(t=>`<div class="row ${t.done?'done':''}">
+      ${checkbox(t.done,'toggletask','data-id="'+t.id+'"')}
+      <button class="body" data-act="detail" data-id="${t.id}">
+        <div class="t">${esc(t.title||'Untitled')}</div>
+        <div class="m">${esc(t.cat)}${t.photos&&t.photos.length?`<span>${I.cam} ${t.photos.length}</span>`:''}${S.logs.some(l=>l.refId===t.id)?`<span>${I.doc} logged</span>`:''}</div>
+      </button>
+      ${editing?`<button class="icb" data-act="edittask" data-id="${t.id}" aria-label="Edit">${I.pencil}</button>
+      <button class="icb" data-act="deltask" data-id="${t.id}" aria-label="Remove">${I.trash}</button>`:''}
+    </div>`).join('')}</section>`).join('')}`;
+}
+
+/* ---------- Seasons ---------- */
+function viewSeasons(){
+  const y=S.activeYear, years=yearsTouched(), now=new Date().getFullYear();
+  const isCurrent=y===now, doneN=seasonalDone(y), totalN=seasonalTotal(y), cur=currentSeason();
+  const order=(x,ms)=>x.month?ms.indexOf(+x.month):99;
+  const nowM=new Date().getMonth()+1;
+
+  // What needs doing right now, across all seasons
+  let due='';
+  if(isCurrent){
+    const open=S.yearly.filter(x=>dueInYear(x,y)&&!S.yearlyDone[yearKey(x.id,y)]);
+    const dueNow=open.filter(x=>x.month?+x.month===nowM:x.season===cur);
+    const slipped=open.filter(x=>x.month&&+x.month<nowM);
+    due=`<div class="card"><div class="head" style="cursor:default;padding-bottom:6px"><b>Due now</b><i>${MONTHS[nowM-1]}</i></div>
+      <div class="inner" style="padding-top:0">
+      ${dueNow.length?dueNow.map(x=>yearRow(x,y,true)).join(''):'<p class="hint" style="margin:6px 0 4px">Nothing due this month.</p>'}
+      ${slipped.length?`<button class="btn" style="margin-top:10px;border-style:dashed" data-act="slipped">${slippedOpen?I.x:I.right} ${slipped.length} from earlier this year${slippedOpen?'':' still open'}</button>
+        ${slippedOpen?slipped.map(x=>yearRow(x,y,true)).join(''):''}`:''}
+      </div></div>`;
+  }
+
+  return `<div style="display:flex;gap:8px;margin-bottom:12px;align-items:stretch">
+    <div class="yearbar" style="flex:1;margin:0">
+      <button data-act="year" data-v="${y-1}" ${y-1<Math.min(...years)?'disabled':''} aria-label="Previous year">${I.left}</button>
+      <div style="text-align:center"><b>${y}</b><small>${doneN} of ${totalN} done${isCurrent?'':' in a past year'}</small></div>
+      <button data-act="year" data-v="${y+1}" ${y+1>now?'disabled':''} aria-label="Next year">${I.right}</button>
+    </div>
+    <button class="btn editbtn ${editing?'on':''}" data-act="edit">${editing?'Done':'Edit'}</button>
+  </div>
+  ${isCurrent?'':`<p class="hint">A past year. What you checked then stays as a record.</p>`}
+  ${due}
+  ${(()=>{
+    const [name,ms,range]=SEASONS.find(([n])=>n===seasonSel)||SEASONS[0];
+    const rows=S.yearly.filter(x=>x.season===name).sort((a,b)=>order(a,ms)-order(b,ms));
+    const isNow=name===cur&&isCurrent;
+    return `<section class="grp"><h3>${name}<span>${range}${isNow?' — now':''}</span></h3>
+      ${rows.map(x=>yearRow(x,y,false)).join('')}
+      ${rows.length?'':`<p class="hint" style="margin:8px 0">Nothing in ${name} yet.</p>`}
+      <button class="btn dash" style="margin-top:10px" data-act="newyear" data-v="${name}">${I.plus} Add an item to ${name}</button>
+    </section>`;
+  })()}
+  ${isCurrent?'':`<div class="btns" style="margin-top:24px"><button class="btn dark" data-act="year" data-v="${now}">Back to ${now}</button></div>`}
+  <button class="btn" style="margin-top:16px" data-act="calendar">${I.cal} Put this list in my phone's calendar</button>
+  <p class="hint" style="margin-top:12px">Pick a season at the top. Every January the boxes clear and the same list comes back; the arrows step back through past years.</p>`;
+}
+function yearRow(x,y,showSeason){
+  const on=!!S.yearlyDone[yearKey(x.id,y)], next=nextDueYear(x,y), notDue=!on&&next!==null&&next>y;
+  const last=lastDoneBefore(x.id,y);
+  const meta=notDue
+    ? [`done ${last}`,`next due ${next}`]
+    : [showSeason?x.season:'',x.cat,x.freq,x.month?MONTHS[x.month-1]:'',last&&!on?'last done '+last:''];
+  return `<div class="row ${on?'done':''} ${notDue?'notdue':''}">
+    ${notDue?`<button class="box on soft" data-act="toggleyear" data-id="${x.id}" aria-label="Mark done again this year">${I.check}</button>`
+            :checkbox(on,'toggleyear','data-id="'+x.id+'"')}
+    <button class="body" data-act="yeardetail" data-id="${x.id}">
+      <div class="t">${esc(x.title)}</div>
+      <div class="m">${meta.filter(Boolean).map(esc).join(' · ')}${S.logs.some(l=>l.refId===x.id)?`<span>${I.doc} logged</span>`:''}</div>
+    </button>
+    ${editing?`<button class="icb" data-act="edityear" data-id="${x.id}" aria-label="Edit">${I.pencil}</button>
+    <button class="icb" data-act="delyear" data-id="${x.id}" aria-label="Remove">${I.trash}</button>`:''}
+  </div>`;
+}
+
+/* ---------- Photos ---------- */
+function viewPhotos(){
+  const groups=photoGroups();
+  const places=groups.filter(g=>g.key).map(g=>g.name);
+  const top=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <h2 class="sec" style="margin:0;flex:1">Photo log${S.photos.length?` <em>${S.photos.length}</em>`:''}</h2>
+    ${S.photos.length?`<button class="btn editbtn ${editing?'on':''}" data-act="edit">${editing?'Done':'Edit'}</button>`:''}
+  </div>`;
+  if(!S.photos.length) return top+`
+    <p class="hint">Nothing yet. Photograph anything you want to compare later — a crack, a serial plate, a wet spot, an invoice — then give it a spot on the property so its history stays together.</p>
+    <button class="btn solid" data-act="snapfree">${I.cam} Take a photo</button>`;
+  return top+`
+  <button class="btn solid" data-act="snapfree" style="margin-bottom:16px">${I.cam} Take a photo</button>
+  <datalist id="places">${places.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+  ${groups.map(g=>`<section class="grp">
+    <h3>${g.key?esc(g.name):'No spot yet'}<span>${g.photos.length===1?'1 photo':g.photos.length+' photos'}${g.key&&g.photos.length>1?` · <button class="linkbtn" data-act="compare" data-v="${esc(g.key)}">Compare</button>`:''}</span></h3>
+    ${g.photos.map(p=>`<div class="row prow">
+      <button class="thumb" data-act="viewphoto" data-id="${p.id}" aria-label="View photo">${photoCache[p.id]?`<img src="${photoCache[p.id]}" alt="">`:I.img}</button>
+      <div class="body">
+        <input data-act="caption" data-id="${p.id}" value="${esc(p.caption)}" placeholder="What is this?">
+        ${(!g.key||editing)?`<input data-act="where" data-id="${p.id}" list="places" value="${esc(p.where)}" placeholder="Where on the property" style="margin-top:6px">`:''}
+        <div class="m" style="margin-top:4px">${esc(fmtDate(p.addedAt))}</div>
+      </div>
+      ${editing?`<button class="icb" data-act="delphoto" data-id="${p.id}" aria-label="Delete">${I.trash}</button>`:''}
+    </div>`).join('')}
+  </section>`).join('')}`;
+}
+/* Photos grouped by the spot they were taken, newest spot first; unlabelled ones on top so they get named. */
+function photoGroups(){
+  const map=new Map();
+  for(const p of S.photos){
+    const key=(p.where||'').trim().toLowerCase();
+    if(!map.has(key)) map.set(key,{key,name:(p.where||'').trim(),photos:[]});
+    map.get(key).photos.push(p);
+  }
+  const gs=[...map.values()];
+  gs.sort((a,b)=>(a.key?1:0)-(b.key?1:0)||(b.photos[0].addedAt>a.photos[0].addedAt?1:-1));
+  return gs;
+}
+function photosAt(key){ return S.photos.filter(p=>(p.where||'').trim().toLowerCase()===key).slice().reverse(); } // oldest first
+function fmtDate(s){
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||''); if(!m) return s||'';
+  return `${MONTHS[+m[2]-1].slice(0,3)} ${+m[3]}, ${m[1]}`;
+}
+
+/* ---------- Budget ---------- */
+const num=v=>{ const n=parseFloat(String(v??'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
+const money=n=>'$'+(Math.round(n*100)/100).toLocaleString(undefined,{maximumFractionDigits:2});
+const yearOf=d=>+String(d||'').slice(0,4);
+function lineSpent(l,y){
+  const e=(l.entries||[]).filter(x=>yearOf(x.date)===y).reduce((s,x)=>s+num(x.amount),0);
+  const b=(S.buy||[]).filter(x=>x.lineId===l.id&&x.bought&&yearOf(x.bought)===y).reduce((s,x)=>s+num(x.paid||x.est),0);
+  return e+b;
+}
+const logSpent=y=>S.logs.filter(l=>yearOf(l.date)===y).reduce((s,l)=>s+num(l.cost),0);
+const unassignedBuys=y=>(S.buy||[]).filter(x=>!x.lineId&&x.bought&&yearOf(x.bought)===y).reduce((s,x)=>s+num(x.paid||x.est),0);
+function budgetYears(){
+  const set=new Set(yearsTouched());
+  (S.budget||[]).forEach(l=>(l.entries||[]).forEach(e=>set.add(yearOf(e.date))));
+  (S.buy||[]).forEach(b=>{ if(b.bought) set.add(yearOf(b.bought)); });
+  return [...set].filter(Boolean).sort((a,b)=>a-b);
+}
+function bar(spent,planned){
+  const pct=planned>0?Math.min(100,Math.round(spent/planned*100)):0, over=planned>0&&spent>planned;
+  return `<div class="bar"><i style="width:${pct}%" class="${over?'over':''}"></i></div>`;
+}
+function viewBudget(){
+  const y=S.activeYear, now=new Date().getFullYear(), years=budgetYears();
+  const lines=S.budget||[], buys=S.buy||[];
+  const planned=lines.reduce((s,l)=>s+num(l.planned),0);
+  const fromLogs=logSpent(y), loose=unassignedBuys(y);
+  const spent=lines.reduce((s,l)=>s+lineSpent(l,y),0)+fromLogs+loose;
+  const open=buys.filter(b=>!b.bought), got=buys.filter(b=>b.bought&&yearOf(b.bought)===y);
+  const buyRow=b=>`<div class="row ${b.bought?'done':''}">
+      ${checkbox(!!b.bought,'togglebuy','data-id="'+b.id+'"')}
+      <button class="body" data-act="buyedit" data-id="${b.id}">
+        <div class="t">${esc(b.title)}</div>
+        <div class="m">${[b.bought?'bought '+fmtDate(b.bought):'',num(b.paid||b.est)?money(num(b.paid||b.est)):'',(lines.find(l=>l.id===b.lineId)||{}).name,b.note].filter(Boolean).map(esc).join(' · ')}</div>
+      </button>
+      ${editing?`<button class="icb" data-act="delbuy" data-id="${b.id}" aria-label="Remove">${I.trash}</button>`:''}
+    </div>`;
+  return `<div style="display:flex;gap:8px;margin-bottom:12px;align-items:stretch">
+    <div class="yearbar" style="flex:1;margin:0">
+      <button data-act="year" data-v="${y-1}" ${y-1<Math.min(...years)?'disabled':''} aria-label="Previous year">${I.left}</button>
+      <div style="text-align:center"><b>${y}</b><small>${money(spent)} of ${money(planned)}</small></div>
+      <button data-act="year" data-v="${y+1}" ${y+1>now?'disabled':''} aria-label="Next year">${I.right}</button>
+    </div>
+    <button class="btn editbtn ${editing?'on':''}" data-act="edit">${editing?'Done':'Edit'}</button>
+  </div>
+  <div class="card"><div class="inner" style="padding-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><b class="cond" style="font-size:22px">${money(spent)} spent</b><span class="hint" style="margin:0">${planned?money(Math.max(0,planned-spent))+' left':'no plan yet'}</span></div>
+    ${bar(spent,planned)}
+    ${planned&&spent>planned?`<p class="hint" style="margin:6px 0 0;color:var(--warn)">${money(spent-planned)} over the plan.</p>`:''}
+  </div></div>
+
+  <section class="grp"><h3>Budget lines<span>planned per year</span></h3>
+    ${lines.map(l=>{ const sp=lineSpent(l,y), pl=num(l.planned); return `<div class="row" style="flex-direction:column;gap:6px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="body" data-act="line" data-id="${l.id}"><div class="t">${esc(l.name)}</div>
+          <div class="m">${money(sp)}${pl?' of '+money(pl):''}</div></button>
+        ${editing?`<button class="icb" data-act="lineedit" data-id="${l.id}" aria-label="Edit">${I.pencil}</button>
+        <button class="icb" data-act="delline" data-id="${l.id}" aria-label="Remove">${I.trash}</button>`:''}
+      </div>${bar(sp,pl)}</div>`; }).join('')}
+    ${fromLogs?`<div class="row" style="flex-direction:column;gap:6px"><div><div class="t" style="color:var(--ink70)">From service records</div><div class="m">${money(fromLogs)} · costs entered on records this year</div></div></div>`:''}
+    ${loose?`<div class="row" style="flex-direction:column;gap:6px"><div><div class="t" style="color:var(--ink70)">Purchases not on a line</div><div class="m">${money(loose)}</div></div></div>`:''}
+    <button class="btn dash" style="margin-top:10px" data-act="newline">${I.plus} Add a budget line</button>
+  </section>
+
+  <section class="grp"><h3>Things to buy<span>${open.length?money(open.reduce((s,b)=>s+num(b.est),0))+' to go':'nothing waiting'}</span></h3>
+    ${open.map(buyRow).join('')}
+    ${open.length?'':'<p class="hint" style="margin:8px 0">Nothing on the list.</p>'}
+    <button class="btn dash" style="margin-top:10px" data-act="newbuy">${I.plus} Add something to buy</button>
+    ${got.length?`<h4 style="margin:18px 0 4px;font:700 15px ${'Barlow Condensed'},sans-serif;color:var(--ink70)">Bought in ${y}</h4>${got.map(buyRow).join('')}`:''}
+  </section>
+  <p class="hint" style="margin-top:12px">Planned amounts are per year. Spending comes from what you add on each line, from purchases you tick off, and from any cost you put on a service record.</p>`;
+}
+
+/* ---------- Gear ---------- */
+function viewGear(){
+  const y=S.activeYear;
+  return `<h2 class="sec">Equipment on site</h2>
+  <p class="hint">Tune-ups, part numbers, and what you did last time.</p>
+  ${S.equipment.map(e=>{
+    const open=openEquip===e.id;
+    const d=e.checks.filter(c=>S.equipDone[e.id+':'+c.id+':'+y]).length;
+    return `<div class="card">
+      <button class="head" data-act="equip" data-id="${e.id}">
+        <b>${esc(e.name)}</b><i>${e.checks.length?`${d}/${e.checks.length} in ${y}`:'no checks yet'}</i></button>
+      ${open?`<div class="inner">
+        <div class="fields" style="display:grid;gap:8px;margin-bottom:16px">
+          <input data-act="eq" data-id="${e.id}" data-f="name" value="${esc(e.name)}" placeholder="Name">
+          <div style="display:flex;gap:8px">
+            <input data-act="eq" data-id="${e.id}" data-f="make" value="${esc(e.make)}" placeholder="Make">
+            <input data-act="eq" data-id="${e.id}" data-f="model" value="${esc(e.model)}" placeholder="Model">
+          </div>
+          <input data-act="eq" data-id="${e.id}" data-f="serial" value="${esc(e.serial)}" placeholder="Serial number">
+        </div>
+        <h3 style="font:700 17px 'Barlow Condensed';margin:0 0 6px">Sizes and part numbers</h3>
+        ${e.specs.map(s=>`<div class="specrow">
+          <input data-act="espec" data-id="${e.id}" data-sid="${s.id}" data-f="k" value="${esc(s.k)}" placeholder="What">
+          <input data-act="espec" data-id="${e.id}" data-sid="${s.id}" data-f="v" value="${esc(s.v)}" placeholder="Size or part no.">
+          <button class="icb" data-act="delespec" data-id="${e.id}" data-sid="${s.id}">${I.trash}</button></div>`).join('')}
+        <button class="btn" data-act="addespec" data-id="${e.id}">${I.plus} Add a size</button>
+
+        <h3 style="font:700 17px 'Barlow Condensed';margin:18px 0 6px">Tune-up checks</h3>
+        ${e.checks.map(c=>{
+          const on=!!S.equipDone[e.id+':'+c.id+':'+y];
+          return `<div class="row" style="align-items:flex-start">
+            ${checkbox(on,'toggleequip','data-id="'+e.id+'" data-cid="'+c.id+'"')}
+            <div class="body">
+              <input data-act="echk" data-id="${e.id}" data-cid="${c.id}" data-f="title" value="${esc(c.title)}"
+                style="border:0;background:none;padding:0;min-height:0;border-radius:0;font-weight:500;${on?'color:var(--ink70)':''}">
+              <input data-act="echk" data-id="${e.id}" data-cid="${c.id}" data-f="freq" value="${esc(c.freq)}"
+                style="border:0;background:none;padding:0;min-height:0;border-radius:0;font-size:13px;color:var(--ink70)">
+            </div>
+            <button class="icb" data-act="delechk" data-id="${e.id}" data-cid="${c.id}">${I.trash}</button></div>`;
+        }).join('')}
+        <button class="btn" style="margin-top:10px" data-act="addechk" data-id="${e.id}">${I.plus} Add a check</button>
+        ${logHTML(S.logs.filter(l=>l.refId===e.id),false)}
+        <div class="btns">
+          <button class="btn" data-act="log" data-id="${e.id}" data-sub="${esc(e.name)}">${I.doc} Log a service</button>
+          <button class="btn danger" data-act="delequip" data-id="${e.id}">${I.trash} Remove this equipment</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('')}
+  <button class="btn" data-act="addequip">${I.plus} Add equipment</button>`;
+}
+
+/* ---------- House ---------- */
+function viewHouse(){
+  const y=S.activeYear;
+  const spend=S.logs.reduce((a,l)=>a+(parseFloat(l.cost)||0),0)+S.tasks.reduce((a,t)=>a+(parseFloat(t.cost)||0),0);
+  const vis=visibleTasks();
+  const yd=S.yearly.filter(x=>S.yearlyDone[yearKey(x.id,y)]).length;
+
+  return `<h2 class="sec">Property name</h2>
+  <input data-act="pname" value="${esc(S.propertyName)}" placeholder="Name this place">
+
+  <h2 class="sec">Theme</h2>
+  <div class="themes">${Object.entries(THEMES).map(([k,t])=>`
+    <button class="tbtn ${S.theme===k?'on':''}" data-act="theme" data-v="${k}">
+      <span class="sw"><i style="background:${t.ground}"></i><i style="background:${t.ink}"></i><i style="background:${t.accent}"></i></span>
+      ${t.label}</button>`).join('')}</div>
+
+  <h2 class="sec">Sizes</h2>
+  <p class="hint">Filter sizes and part numbers, so you measure once.</p>
+  ${S.specs.map(s=>`<div class="specrow">
+    <input data-act="spec" data-sid="${s.id}" data-f="k" value="${esc(s.k)}" placeholder="What">
+    <input data-act="spec" data-sid="${s.id}" data-f="v" value="${esc(s.v)}" placeholder="Size or part no.">
+    <button class="icb" data-act="delspec" data-sid="${s.id}">${I.trash}</button></div>`).join('')}
+  <button class="btn" data-act="addspec">${I.plus} Add a size</button>
+
+  <h2 class="sec">Where things stand</h2>
+  <dl class="kv">
+    <dt>Setup</dt><dd>${setupOpen()?`${vis.filter(t=>t.done).length} of ${vis.length} items`:'Finished'}</dd>
+    <dt>${y}</dt><dd>${yd} of ${S.yearly.length} seasonal items</dd>
+    <dt>Records</dt><dd>${S.logs.length}</dd>
+    <dt>Photos</dt><dd>${S.photos.length}</dd>
+    <dt>Logged spend</dt><dd>${spend?'$'+spend.toLocaleString():'Nothing logged yet'}</dd>
+  </dl>
+  ${!setupOpen()?`<p class="hint" style="margin-top:12px">The setup checklist is done and its tab is tucked away.</p>
+    <div class="btns" style="margin-top:0"><button class="btn" data-act="reopenall">Show the setup list again</button></div>`:
+    closedList().length?`<p class="hint" style="margin-top:12px">Closed out: ${closedList().map(p=>
+    `${esc(p)} <button class="btn" style="display:inline-flex;width:auto;min-height:0;padding:3px 9px;font-size:12.5px" data-act="reopenphase" data-v="${esc(p)}">bring back</button>`).join(' · ')}</p>`:''}
+
+  <h2 class="sec">Who to call</h2>
+  ${S.contacts.map(c=>`<div class="row">
+    <div class="body"><div class="t">${esc(c.name)}</div><div class="m">${esc(c.role)}</div></div>
+    ${c.phone?`<a href="tel:${esc(c.phone.replace(/[^\d]/g,''))}" style="font-weight:600;white-space:nowrap">${esc(c.phone)}</a>`:''}
+    <button class="icb" data-act="delcontact" data-id="${c.id}">${I.trash}</button></div>`).join('')}
+  <div class="addbox">
+    <input data-act="nc" data-f="name" value="${esc(draftContact.name)}" placeholder="Name — who or what company">
+    <div style="display:flex;gap:8px">
+      <input data-act="nc" data-f="role" value="${esc(draftContact.role)}" placeholder="What they do">
+      <input data-act="nc" data-f="phone" value="${esc(draftContact.phone)}" placeholder="Phone" inputmode="tel">
+    </div>
+    <button class="btn dark" data-act="savecontact">${I.plus} Add this contact</button>
+  </div>
+
+  <h2 class="sec">Service history</h2>
+  ${S.logs.length?logHTML(S.logs,true):'<p class="hint">Nothing recorded yet. Every check, cleaning and service you log lands here in date order.</p>'}
+
+  <h2 class="sec">Sharing</h2>
+  <p class="hint">${esc(cloud.describe())}</p>
+  ${cloud.code?`<dl class="kv" style="margin-bottom:12px"><dt>House code</dt><dd style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-family:ui-monospace,monospace">${esc(cloud.code)}</span><button class="linkbtn" data-act="copycode">Copy</button></dd></dl>
+    <div class="btns" style="margin-top:0">
+      ${cloud.status==='error'?`<button class="btn" data-act="reconnect">Try connecting again</button>`:''}
+      <button class="btn" data-act="disconnect">Stop sharing on this phone</button>
+    </div>
+    <p class="hint" style="margin-top:8px">Your partner opens the same web address, taps Share this house, and enters the code. Stopping keeps a copy on this phone; it just stops syncing.</p>`
+  :`<div class="btns" style="margin-top:0"><button class="btn solid" data-act="connect">${I.home} Share this house</button></div>`}
+
+  <h2 class="sec">Calendar</h2>
+  <p class="hint">Put the seasonal list in your phone's calendar as yearly reminders. Share that calendar with your partner and you both get them.</p>
+  <button class="btn" data-act="calendar">${I.cal} Put this list in my phone's calendar</button>
+
+  <h2 class="sec">Backup</h2>
+  <p class="hint">Last backup: ${S.lastBackup?esc(fmtDate(S.lastBackup)):'never'}</p>
+  <div class="btns" style="margin-top:0">
+    <button class="btn dark" data-act="backup">${I.save} Download a backup</button>
+    <button class="btn" data-act="pickbackup">Restore from a backup file</button>
+    <button class="btn" data-act="pasterestore">Restore by pasting the text</button>
+  </div>`;
+}
+
+const VIEWS={list:viewList,seasons:viewSeasons,photos:viewPhotos,gear:viewGear,budget:viewBudget,house:viewHouse};
+const TABS=[['list','Setup',I.list],['seasons','Seasons',I.cal],['photos','Photos',I.cam],['gear','Equipment',I.wrench],['budget','Budget',I.coin],['house','House',I.home]];
+const visibleTabs=()=>TABS.filter(([k])=>k!=='list'||setupOpen());
+
+function render(){
+  if(!VIEWS[tab]||(tab==='list'&&!setupOpen())) tab='seasons';
+  applyTheme(); renderHeader();
+  document.getElementById('view').innerHTML=VIEWS[tab]();
+  document.getElementById('nav').innerHTML=visibleTabs().map(([k,l,ic])=>
+    `<button class="${tab===k?'on':''}" data-act="tab" data-v="${k}">${ic}${l}</button>`).join('');
+  document.getElementById('modal').innerHTML=modal?modalHTML():'';
+  // lazy-load any photos on screen
+  const ids=[...document.querySelectorAll('[data-act="viewphoto"]')].map(b=>b.dataset.id);
+  loadPhotos(ids).then(changed=>{ if(changed) render(); });
+}
+
+/* ============================================================
+   Modals
+============================================================ */
+function modalHTML(){
+  if(modal.kind==='task'){
+    const d=modal.draft;
+    return sheet(modal.isNew?'New item':'Edit item',`
+      <textarea rows="2" data-m="title" placeholder="What needs doing">${esc(d.title)}</textarea>
+      <div style="display:flex;gap:8px">
+        <select data-m="when">${PHASES.map(p=>`<option ${d.when===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+        <input data-m="cat" value="${esc(d.cat)}" placeholder="Category">
+      </div>
+      <input data-m="contact" value="${esc(d.contact)}" placeholder="Phone or contact">
+      <input data-m="url" value="${esc(d.url)}" placeholder="Link">
+      <input data-m="cost" value="${esc(d.cost)}" placeholder="Cost" inputmode="decimal">
+      <textarea rows="3" data-m="notes" placeholder="Notes">${esc(d.notes)}</textarea>
+      ${stripHTML(d.photos)}
+      <button class="btn" data-act="mphoto">${I.cam} Add a photo</button>
+      <button class="btn solid" data-act="done">Done</button>`,true);
+  }
+  if(modal.kind==='log'){
+    const d=modal.draft;
+    return sheet('Record the work',`
+      <div class="m" style="margin-bottom:2px">${esc(d.subject)}</div>
+      <div style="display:flex;gap:8px">
+        <label class="lbl" style="flex:1">Date<input type="date" data-m="date" value="${esc(d.date)}"></label>
+        <label class="lbl" style="flex:1">Time<input type="time" data-m="time" value="${esc(d.time)}"></label>
+      </div>
+      <textarea rows="3" data-m="what" placeholder="What was done">${esc(d.what)}</textarea>
+      <div style="display:flex;gap:8px">
+        <input data-m="who" value="${esc(d.who)}" placeholder="Who did it">
+        <input data-m="cost" value="${esc(d.cost)}" placeholder="Cost" inputmode="decimal">
+      </div>
+      <input data-m="doc" value="${esc(d.doc)}" placeholder="Invoice, report or permit number">
+      ${stripHTML(d.photos)}
+      <button class="btn" data-act="mphoto">${I.cam} Photograph the paperwork</button>
+      <button class="btn solid" data-act="done">Done</button>`,true);
+  }
+  if(modal.kind==='detail'){
+    const t=S.tasks.find(x=>x.id===modal.id); if(!t) return '';
+    return sheet(t.title||'Untitled',`
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span class="tag ${t.when==='Before closing'?'warn':t.when==='Watch'?'link':''}">${esc(t.when)}</span>
+        <span class="m">${esc(t.cat)}</span></div>
+      ${t.notes?`<p style="line-height:1.55;color:var(--ink70);margin:0">${esc(t.notes)}</p>`:''}
+      ${stripHTML(t.photos)}
+      ${t.contact?`<div class="m">${esc(t.contact)}</div>`:''}
+      ${t.url?`<a href="${esc(t.url)}" target="_blank" rel="noreferrer">Open the reference</a>`:''}
+      ${logHTML(S.logs.filter(l=>l.refId===t.id),false)}
+      <button class="btn" data-act="log" data-id="${t.id}" data-sub="${esc(t.title)}">${I.doc} Record when this was done</button>
+      <button class="btn" data-act="edittask" data-id="${t.id}">${I.pencil} Edit this item</button>`);
+  }
+  if(modal.kind==='yearitem'){
+    const d=modal.draft, ms=seasonMonths(d.season);
+    return sheet(modal.isNew?'New seasonal item':'Edit seasonal item',`
+      <textarea rows="2" data-m="title" placeholder="What needs doing">${esc(d.title)}</textarea>
+      <div style="display:flex;gap:8px">
+        <label class="lbl" style="flex:1">Season
+          <select data-m="season">${SEASONS.map(([n])=>`<option ${d.season===n?'selected':''}>${n}</option>`).join('')}</select></label>
+        <label class="lbl" style="flex:1">Month
+          <select data-m="month"><option value="0">Any time</option>${ms.map(m=>`<option value="${m}" ${+d.month===m?'selected':''}>${MONTHS[m-1]}</option>`).join('')}</select></label>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input data-m="freq" value="${esc(d.freq)}" placeholder="How often">
+        <input data-m="cat" value="${esc(d.cat)}" placeholder="Category">
+      </div>
+      <textarea rows="3" data-m="notes" placeholder="Notes">${esc(d.notes)}</textarea>
+      <button class="btn solid" data-act="done">Done</button>`,true);
+  }
+  if(modal.kind==='yeardetail'){
+    const x=S.yearly.find(z=>z.id===modal.id); if(!x) return '';
+    const y=S.activeYear, on=!!S.yearlyDone[yearKey(x.id,y)];
+    return sheet(x.title,`
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+        <span class="tag">${esc(x.season)}${x.month?', '+MONTHS[x.month-1]:''}</span>
+        <span class="hint" style="margin:0">${[x.cat,x.freq].filter(Boolean).map(esc).join(' · ')}</span></div>
+      ${x.notes?`<p style="line-height:1.55;color:var(--ink70);margin:0">${esc(x.notes)}</p>`:''}
+      <div class="row" style="border:0;padding:4px 0;align-items:center">${checkbox(on,'toggleyear','data-id="'+x.id+'"')}
+        <div class="body" style="font-weight:500">${on?'Done in '+y:'Not done yet in '+y}</div></div>
+      ${logHTML(S.logs.filter(l=>l.refId===x.id),false)}
+      <button class="btn" data-act="log" data-id="${x.id}" data-sub="${esc(x.title)}">${I.doc} Record when this was done</button>
+      <button class="btn" data-act="edityear" data-id="${x.id}">${I.pencil} Edit this item</button>`);
+  }
+  if(modal.kind==='connect'){
+    const needCfg=!cloud.hasConfig();
+    return sheet('Share this house',`
+      <p class="hint" style="margin:0">Everyone who enters the same house code sees and edits the same house. Make it something only you two would know, at least eight characters — letters, numbers and dashes.</p>
+      ${modal.joinNote?`<p class="hint" style="margin:0;color:var(--warn)">${esc(modal.joinNote)}</p>`:''}
+      <label class="lbl">House code<input data-m="code" value="${esc(modal.code||'')}" placeholder="county-rd-j-2026" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+      ${needCfg?`<label class="lbl">Firebase config (paste the whole block from the Firebase console)<textarea rows="5" data-m="cfg" placeholder="const firebaseConfig = { apiKey: ... }" autocapitalize="none" spellcheck="false">${esc(modal.cfg||'')}</textarea></label>`:''}
+      <p class="hint" style="margin:0">If the house already exists, this phone takes the house's data. If it is new, what is on this phone becomes the house.</p>
+      <button class="btn solid" data-act="doconnect">Connect</button>
+      <button class="btn" data-act="nocloud">Just this phone for now</button>`);
+  }
+  if(modal.kind==='line'){
+    const l=(S.budget||[]).find(x=>x.id===modal.id); if(!l) return '';
+    const y=S.activeYear, es=(l.entries||[]).filter(e=>yearOf(e.date)===y).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const bs=(S.buy||[]).filter(b=>b.lineId===l.id&&b.bought&&yearOf(b.bought)===y);
+    return sheet(l.name,`
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><b class="cond" style="font-size:20px">${money(lineSpent(l,y))} in ${y}</b><span class="hint" style="margin:0">${num(l.planned)?'planned '+money(num(l.planned)):'no plan set'}</span></div>
+      ${bar(lineSpent(l,y),num(l.planned))}
+      ${es.length||bs.length?`<div class="log">${es.map(e=>`<div class="e" style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1"><div class="d">${money(num(e.amount))}<em>${esc(fmtDate(e.date))}</em></div>${e.note?`<div class="w">${esc(e.note)}</div>`:''}</div><button class="icb" data-act="delspend" data-id="${e.id}" data-line="${l.id}" aria-label="Remove">${I.trash}</button></div>`).join('')}
+        ${bs.map(b=>`<div class="e"><div class="d">${money(num(b.paid||b.est))}<em>${esc(fmtDate(b.bought))} · bought</em></div><div class="w">${esc(b.title)}</div></div>`).join('')}</div>`
+        :`<p class="hint" style="margin:0">Nothing spent on this yet in ${y}.</p>`}
+      <button class="btn solid" data-act="newspend" data-id="${l.id}">${I.plus} Add spending</button>
+      <button class="btn" data-act="lineedit" data-id="${l.id}">${I.pencil} Edit name or plan</button>`);
+  }
+  if(modal.kind==='lineedit'){
+    const d=modal.draft;
+    return sheet(modal.isNew?'New budget line':'Edit budget line',`
+      <input data-m="name" value="${esc(d.name)}" placeholder="What is it for">
+      <label class="lbl">Planned per year<input data-m="planned" value="${esc(d.planned)}" inputmode="decimal" placeholder="0"></label>
+      <button class="btn solid" data-act="done">Done</button>`,true);
+  }
+  if(modal.kind==='spend'){
+    const d=modal.draft;
+    return sheet('Add spending',`
+      <div style="display:flex;gap:8px">
+        <label class="lbl" style="flex:1">Amount<input data-m="amount" value="${esc(d.amount)}" inputmode="decimal" placeholder="0"></label>
+        <label class="lbl" style="flex:1">Date<input type="date" data-m="date" value="${esc(d.date)}"></label>
+      </div>
+      <input data-m="note" value="${esc(d.note)}" placeholder="What was it">
+      <button class="btn solid" data-act="done">Done</button>`,true);
+  }
+  if(modal.kind==='buyedit'){
+    const d=modal.draft;
+    return sheet(modal.isNew?'Something to buy':'Edit purchase',`
+      <input data-m="title" value="${esc(d.title)}" placeholder="What to buy">
+      <div style="display:flex;gap:8px">
+        <label class="lbl" style="flex:1">Est. price<input data-m="est" value="${esc(d.est)}" inputmode="decimal" placeholder="0"></label>
+        <label class="lbl" style="flex:1">Budget line<select data-m="lineId"><option value="">None</option>${(S.budget||[]).map(l=>`<option value="${l.id}" ${d.lineId===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></label>
+      </div>
+      <input data-m="note" value="${esc(d.note)}" placeholder="Store, size, model, why">
+      <input data-m="url" value="${esc(d.url)}" placeholder="Link" inputmode="url">
+      ${d.bought?`<div style="display:flex;gap:8px">
+        <label class="lbl" style="flex:1">Paid<input data-m="paid" value="${esc(d.paid)}" inputmode="decimal" placeholder="${esc(d.est||'0')}"></label>
+        <label class="lbl" style="flex:1">Bought on<input type="date" data-m="bought" value="${esc(d.bought)}"></label>
+      </div>`:''}
+      ${d.url?`<a class="btn" href="${esc(d.url)}" target="_blank" rel="noopener">Open the link</a>`:''}
+      <button class="btn ${d.bought?'':'solid'}" data-act="togglebuy" data-id="${d.id}">${d.bought?'Mark as not bought':I.check+' Mark as bought'}</button>
+      <button class="btn ${d.bought?'solid':''}" data-act="done">Done</button>`,true);
+  }
+  if(modal.kind==='paste'){
+    return sheet('Restore from pasted text',`
+      <p class="hint" style="margin:0">Paste the backup text you copied from the other copy of the app. This replaces everything here.</p>
+      <textarea rows="6" id="pst" placeholder="Paste here"></textarea>
+      <button class="btn solid" data-act="dopaste">Restore</button>`);
+  }
+  if(modal.kind==='backup'){
+    const kb=Math.round(modal.text.length/1024);
+    return sheet('Back up everything',`
+      <p class="hint" style="margin:0">One file with every item, record, size and photo — ${kb} KB. Saving straight to a file is blocked in some browsers, so copying the text always works as a fallback. Paste it into a note or a cloud document.</p>
+      <button class="btn solid" data-act="dlfile">${I.save} Save as a file</button>
+      <button class="btn" data-act="copybackup">Copy the backup text</button>
+      <textarea rows="6" readonly id="bkp">${esc(modal.text)}</textarea>`);
+  }
+  if(modal.kind==='calendar'){
+    return sheet('Add to your calendar',`
+      <p class="hint" style="margin:0">${modal.count} repeating events, one per seasonal item, each with a 9 AM reminder on the first of its month. On an iPhone the file opens straight into Calendar; on Android, open it with Google Calendar.</p>
+      <p class="hint" style="margin:0">Put them in a calendar of their own, name it House HQ, and share that calendar from the Calendar app so your partner gets the same reminders. If you add items later, run this again and clear any duplicates your calendar makes.</p>
+      ${modal.canShare?`<button class="btn solid" data-act="calshare">${I.cal} Send to Calendar</button>`:''}
+      <button class="btn ${modal.canShare?'':'solid'}" data-act="caldl">${I.save} Save the calendar file</button>
+      <button class="btn" data-act="calcopy">Copy the calendar text</button>
+      <textarea rows="4" readonly id="ics">${esc(modal.text)}</textarea>`);
+  }
+  if(modal.kind==='compare'){
+    const list=photosAt(modal.key); if(list.length<2) return '';
+    const pane=(side)=>{ const i=modal[side], p=list[i]; return `<div class="pane">
+        <img src="${photoCache[p.id]||''}" alt="">
+        <div class="cap"><button data-act="cmpstep" data-side="${side}" data-d="-1" ${i<=0?'disabled':''} aria-label="Earlier">${I.left}</button>
+          <span>${esc(fmtDate(p.addedAt))}${p.caption?' · '+esc(p.caption):''}</span>
+          <button data-act="cmpstep" data-side="${side}" data-d="1" ${i>=list.length-1?'disabled':''} aria-label="Later">${I.right}</button></div>
+      </div>`; };
+    return `<div class="viewer cmp" data-act="scrim">${pane('a')}${pane('b')}
+      <button class="icb cmpx" data-act="closemodal" aria-label="Close">${I.x}</button></div>`;
+  }
+  if(modal.kind==='photo'){
+    return `<div class="viewer" data-act="scrim"><img src="${photoCache[modal.id]||''}" alt=""></div>`;
+  }
+  return '';
+}
+function sheet(title,inner,auto){
+  return `<div class="scrim" data-act="scrim"><div class="sheet">
+    <div class="top"><div><h3>${esc(title)}</h3>${auto?'<div class="auto">Saves as you type</div>':''}</div>
+      <button class="icb" data-act="closemodal" aria-label="Close">${I.x}</button></div>
+    <div class="fields">${inner}</div></div></div>`;
+}
+
+/* Sheets save as you type. A brand-new item is created as soon as it has something in it. */
+function commitDraft(){
+  if(!modal||!modal.draft) return;
+  const d=modal.draft;
+  if(modal.kind==='task'){
+    const has=(d.title||'').trim()||(d.notes||'').trim()||(d.photos&&d.photos.length);
+    const rec={...d,photos:[...(d.photos||[])]};
+    const i=S.tasks.findIndex(x=>x.id===d.id);
+    if(i>=0) S.tasks[i]=rec; else if(has) S.tasks.push(rec); else return;
+  }else if(modal.kind==='yearitem'){
+    if(!(d.title||'').trim()) return;
+    const rec={...d,month:+d.month||0,season:d.season||seasonOf(+d.month||1)};
+    const i=S.yearly.findIndex(x=>x.id===d.id);
+    if(i>=0) S.yearly[i]=rec; else S.yearly.push(rec);
+  }else if(modal.kind==='lineedit'){
+    if(!(d.name||'').trim()) return;
+    const i=S.budget.findIndex(x=>x.id===d.id);
+    if(i>=0) S.budget[i]={...S.budget[i],name:d.name,planned:num(d.planned)};
+    else S.budget.push({id:d.id,name:d.name,planned:num(d.planned),entries:[]});
+  }else if(modal.kind==='spend'){
+    if(!(num(d.amount)>0)) return;
+    const l=S.budget.find(x=>x.id===d.lineId); if(!l) return;
+    l.entries=l.entries||[];
+    const rec={id:d.id,date:d.date,amount:num(d.amount),note:d.note||''};
+    const i=l.entries.findIndex(e=>e.id===d.id);
+    if(i>=0) l.entries[i]=rec; else l.entries.push(rec);
+  }else if(modal.kind==='buyedit'){
+    if(!(d.title||'').trim()) return;
+    const rec={id:d.id,title:d.title,est:num(d.est),note:d.note||'',url:d.url||'',lineId:d.lineId||'',bought:d.bought||null,paid:num(d.paid)};
+    const i=S.buy.findIndex(x=>x.id===d.id);
+    if(i>=0) S.buy[i]={...S.buy[i],...rec}; else S.buy.push(rec);
+  }else if(modal.kind==='log'){
+    const has=(d.what||'').trim()||(d.who||'').trim()||(d.cost||'').trim()||(d.doc||'').trim()||(d.photos&&d.photos.length);
+    const rec={id:d.id,refId:d.refId,subject:d.subject,what:d.what,who:d.who,cost:d.cost,doc:d.doc,
+      photos:[...(d.photos||[])],date:((d.date||'')+' '+(d.time||'')).trim()};
+    const i=S.logs.findIndex(x=>x.id===d.id);
+    if(i>=0) S.logs[i]=rec; else if(has) S.logs.unshift(rec); else return;
+  }else return;
+  saveSoon();
+}
+function closeModal(){
+  if(modal&&modal.draft){
+    commitDraft();
+    if(modal.kind==='yearitem'&&(modal.draft.title||'').trim()) seasonSel=modal.draft.season;
+  }
+  modal=null; flushSave();
+  if(pendingRender){ pendingRender=false; }
+}
+
+/* ============================================================
+   Events
+============================================================ */
+document.addEventListener('input',async e=>{
+  const el=e.target, a=el.dataset.act;
+  if(el.id==='q'){ q=el.value; const p=el.selectionStart; render();
+    const n=document.getElementById('q'); if(n){n.focus();n.setSelectionRange(p,p);} return; }
+  if(el.dataset.m && modal){
+    if(modal.draft){
+      modal.draft[el.dataset.m]=el.value;
+      if(el.dataset.m==='season'){ if(!seasonMonths(el.value).includes(+modal.draft.month)) modal.draft.month=0; commitDraft(); render(); return; }
+      commitDraft();
+    } else modal[el.dataset.m]=el.value;
+    return; }
+  if(!a) return;
+  if(a==='pname'){ S.propertyName=el.value; document.getElementById('hname').textContent=el.value||'House HQ'; saveSoon(); return; }
+  if(a==='spec'){ const s=S.specs.find(x=>x.id===el.dataset.sid); s[el.dataset.f]=el.value; saveSoon(); return; }
+  if(a==='eq'){ const q2=S.equipment.find(x=>x.id===el.dataset.id); q2[el.dataset.f]=el.value; saveSoon(); return; }
+  if(a==='espec'){ const q2=S.equipment.find(x=>x.id===el.dataset.id);
+    q2.specs.find(x=>x.id===el.dataset.sid)[el.dataset.f]=el.value; saveSoon(); return; }
+  if(a==='echk'){ const q2=S.equipment.find(x=>x.id===el.dataset.id);
+    q2.checks.find(x=>x.id===el.dataset.cid)[el.dataset.f]=el.value; saveSoon(); return; }
+  if(a==='nc'){ draftContact[el.dataset.f]=el.value; return; }
+  if(a==='caption'||a==='where'){ const p=S.photos.find(x=>x.id===el.dataset.id);
+    p[a==='caption'?'caption':'where']=el.value; saveSoon(); return; }
+});
+
+document.addEventListener('click',async e=>{
+  const btn=e.target.closest('[data-act]');
+  if(!btn) return;
+  const a=btn.dataset.act, id=btn.dataset.id, v=btn.dataset.v;
+
+  if(a==='scrim'){
+    if(Date.now()-modalAt<600) return;            // ignore the ghost click that follows opening
+    if(e.target===btn){ closeModal(); render(); }
+    return; }
+  if(a==='closemodal'||a==='done'){ const back=modal&&modal.back; closeModal();
+    if(back){ modalAt=Date.now(); modal=back; } render(); return; }
+  if(a==='undo'){ if(undoCur){ const u=undoCur; undoCur=null; clearTimeout(undoTimer); u.undo(); } setNote(''); render(); save(); return; }
+  if(a==='slipped'){ slippedOpen=!slippedOpen; render(); return; }
+  if(a==='compare'){ const list=photosAt(v); if(list.length<2) return; await loadPhotos(list.map(p=>p.id));
+    modalAt=Date.now(); modal={kind:'compare',key:v,a:0,b:list.length-1}; render(); return; }
+  if(a==='cmpstep'){ const list=photosAt(modal.key), side=btn.dataset.side, n=modal[side]+(+btn.dataset.d);
+    if(n>=0&&n<list.length){ modal[side]=n; render(); } return; }
+  if(a==='calendar'){ openCalendarSheet(); return; }
+  if(a==='calshare'){ const f=icsFile(modal.text);
+    try{ await navigator.share({files:[f],title:'House HQ calendar'}); modal=null; render(); }
+    catch(e){ if(e&&e.name!=='AbortError') setNote('Sharing did not work here. Save the file or copy the text instead.'); }
+    return; }
+  if(a==='caldl'){ if(!saveFile(modal.text,'house-hq.ics','text/calendar')) setNote('This browser blocked the download. Copy the text instead.'); return; }
+  if(a==='calcopy'){ const t=modal.text;
+    if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>setNote('Calendar text copied.','ok'),()=>selectText('ics'));
+    else selectText('ics');
+    return; }
+  if(a==='clearnote'){ setNote(''); return; }
+  if(a==='tab'){ tab=v; editing=false; closeModal(); render(); return; }
+  if(a==='edit'){ editing=!editing; render(); return; }
+  if(a==='filter'){ filter=v; render(); return; }
+  if(a==='pickseason'){ seasonSel=v; render(); return; }
+  if(a==='equip'){ openEquip=openEquip===id?null:id; render(); return; }
+  if(a==='theme'){ S.theme=v; LS('hq:theme',v); render(); save(); return; }
+  if(a==='year'){ const yr=+v; if(yr>new Date().getFullYear()) return; S.activeYear=yr; render(); save(); return; }
+
+  if(a==='toggletask'){ const t=S.tasks.find(x=>x.id===id);
+    t.done=!t.done; t.doneAt=t.done?Date.now():null; render(); save(); return; }
+  if(a==='toggleyear'){ const k=yearKey(id,S.activeYear);
+    if(S.yearlyDone[k]) delete S.yearlyDone[k]; else S.yearlyDone[k]=Date.now(); render(); save(); return; }
+  if(a==='toggleequip'){ const k=id+':'+btn.dataset.cid+':'+S.activeYear;
+    if(S.equipDone[k]) delete S.equipDone[k]; else S.equipDone[k]=Date.now(); render(); save(); return; }
+
+  if(a==='newtask'){ modalAt=Date.now(), modal={kind:'task',draft:{id:uid(),cat:'',title:'',when:'First month',contact:'',url:'',notes:'',cost:'',done:false,doneAt:null,photos:[]},isNew:true}; render(); return; }
+  if(a==='edittask'){ modalAt=Date.now(), modal={kind:'task',draft:{...S.tasks.find(x=>x.id===id)}}; render(); return; }
+  if(a==='detail'){ modalAt=Date.now(), modal={kind:'detail',id}; render(); return; }
+  if(a==='deltask'){ const i=S.tasks.findIndex(x=>x.id===id); if(i<0) return;
+    const [t]=S.tasks.splice(i,1);
+    deleted('\u201c'+(t.title||'Untitled')+'\u201d',()=>S.tasks.splice(i,0,t)); return; }
+
+  if(a==='newyear'){ modalAt=Date.now(); modal={kind:'yearitem',isNew:true,
+    draft:{id:uid(),season:v,month:0,title:'',cat:'',freq:'Annual',notes:''}}; render(); return; }
+  if(a==='edityear'){ const back=modal&&modal.kind==='yeardetail'?{kind:'yeardetail',id:modal.id}:null;
+    modalAt=Date.now(); modal={kind:'yearitem',back,draft:{...S.yearly.find(x=>x.id===id)}}; render(); return; }
+  if(a==='yeardetail'){ modalAt=Date.now(); modal={kind:'yeardetail',id}; render(); return; }
+  if(a==='delyear'){ const i=S.yearly.findIndex(z=>z.id===id); if(i<0) return;
+    const [x]=S.yearly.splice(i,1), keep={};
+    Object.keys(S.yearlyDone).forEach(k=>{ if(k.startsWith(id+':')){ keep[k]=S.yearlyDone[k]; delete S.yearlyDone[k]; } });
+    if(modal&&modal.kind==='yeardetail'&&modal.id===id) modal=null;
+    deleted('\u201c'+x.title+'\u201d',()=>{ S.yearly.splice(i,0,x); Object.assign(S.yearlyDone,keep); }); return; }
+  if(a==='log'){ const now=new Date();
+    modalAt=Date.now(), modal={kind:'log',draft:{id:uid(),refId:id,subject:btn.dataset.sub||'',date:now.toISOString().slice(0,10),
+      time:now.toTimeString().slice(0,5),what:'',who:'',cost:'',doc:'',photos:[]}}; render(); return; }
+  if(a==='dellog'){ const i=S.logs.findIndex(l=>l.id===id); if(i<0) return;
+    const [l]=S.logs.splice(i,1); deleted('the record from '+l.date,()=>S.logs.splice(i,0,l)); return; }
+
+  if(a==='snap'){ pick(async f=>{
+      const pid=await addPhoto(f,{caption:'',where:''});
+      if(pid){ modalAt=Date.now(); modal={kind:'task',isNew:true,draft:{id:uid(),cat:'Watch',title:'',when:'Watch',contact:'',url:'',notes:'',cost:'',done:false,doneAt:null,photos:[pid]}}; commitDraft(); }
+      render();
+    }); return; }
+  if(a==='snapfree'){ pick(async f=>{ await addPhoto(f,{caption:'',where:''}); render(); }); return; }
+  if(a==='mphoto'){ pick(async f=>{
+      const pid=await addPhoto(f,{caption:modal.draft.title||modal.draft.subject||'',where:''});
+      if(pid && modal && modal.draft){ modal.draft.photos.push(pid); commitDraft(); }
+      render();
+    }); return; }
+  if(a==='viewphoto'){ await loadPhotos([id]); modalAt=Date.now(); modal={kind:'photo',id}; render(); return; }
+  if(a==='delphoto'){ const i=S.photos.findIndex(p=>p.id===id); if(i<0) return;
+    const [ph]=S.photos.splice(i,1), data=photoCache[id], inline=S.photoData&&S.photoData[id];
+    const refs=[];
+    [...S.tasks,...S.logs].forEach(o=>{ const j=(o.photos||[]).indexOf(id); if(j>=0){ refs.push([o,j]); o.photos.splice(j,1); } });
+    if(S.photoData) delete S.photoData[id];
+    delete photoCache[id];
+    deleted('the photo'+(ph.caption?' \u201c'+ph.caption+'\u201d':''),
+      ()=>{ S.photos.splice(i,0,ph); refs.forEach(([o,j])=>o.photos.splice(j,0,id)); photoCache[id]=data; if(inline) S.photoData[id]=inline; },
+      ()=>{ store.del(PKEY(id)); cloud.deletePhoto(id); });
+    return; }
+
+  if(a==='closeout'){ S.closedPhases[v]=new Date().toISOString().slice(0,10);
+    if(filter===v) filter='All';
+    if(!setupOpen()){ tab='seasons'; editing=false; setNote('Setup finished. The seasonal list is home now; the old list is on the House tab if you ever need it.','ok'); }
+    render(); save(); return; }
+  if(a==='reopenphase'){ delete S.closedPhases[v]; render(); save(); return; }
+  if(a==='reopenall'){ S.closedPhases={}; tab='list'; filter='All'; render(); save(); return; }
+
+  if(a==='addspec'){ S.specs.push({id:uid(),k:'',v:''}); render(); save(); return; }
+  if(a==='delspec'){ S.specs=S.specs.filter(x=>x.id!==btn.dataset.sid); render(); save(); return; }
+  if(a==='addespec'){ S.equipment.find(x=>x.id===id).specs.push({id:uid(),k:'',v:''}); render(); save(); return; }
+  if(a==='delespec'){ const q2=S.equipment.find(x=>x.id===id);
+    q2.specs=q2.specs.filter(x=>x.id!==btn.dataset.sid); render(); save(); return; }
+  if(a==='addechk'){ S.equipment.find(x=>x.id===id).checks.push({id:uid(),title:'New check',freq:'Annual'}); render(); save(); return; }
+  if(a==='delechk'){ const q2=S.equipment.find(x=>x.id===id);
+    q2.checks=q2.checks.filter(x=>x.id!==btn.dataset.cid); render(); save(); return; }
+  if(a==='addequip'){ const e2={id:uid(),name:'New equipment',make:'',model:'',serial:'',specs:[],checks:[]};
+    S.equipment.push(e2); openEquip=e2.id; render(); save(); return; }
+  if(a==='delequip'){ const i=S.equipment.findIndex(x=>x.id===id); if(i<0) return;
+    const [e2]=S.equipment.splice(i,1); deleted(e2.name,()=>S.equipment.splice(i,0,e2)); return; }
+
+  if(a==='savecontact'){
+    if(!draftContact.name.trim() && !draftContact.phone.trim()){ setNote('Give the contact a name or a number first.'); return; }
+    S.contacts.push({id:uid(),...draftContact});
+    draftContact={name:'',role:'',phone:''};
+    render(); save(); return; }
+  if(a==='delcontact'){ const i=S.contacts.findIndex(c=>c.id===id); if(i<0) return;
+    const [c]=S.contacts.splice(i,1); deleted(c.name||'the contact',()=>S.contacts.splice(i,0,c)); return; }
+
+  if(a==='backup'){ await backup(); return; }
+  if(a==='dlfile'){ if(saveFile(modal.text,`househq-${new Date().toISOString().slice(0,10)}.json`,'application/json')) markBackedUp();
+    else setNote('This browser blocked the download. Copy the text instead.'); return; }
+  if(a==='copybackup'){
+    const t=modal.text;
+    if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>{ setNote('Backup copied.','ok'); markBackedUp(); },()=>selectText('bkp'));
+    else selectText('bkp');
+    return; }
+  if(a==='pickbackup'){ pickBackupFile(); return; }
+  if(a==='pasterestore'){ modalAt=Date.now(); modal={kind:'paste'}; render(); return; }
+  if(a==='line'){ modalAt=Date.now(); modal={kind:'line',id}; render(); return; }
+  if(a==='newline'){ modalAt=Date.now(); modal={kind:'lineedit',isNew:true,draft:{id:uid(),name:'',planned:''}}; render(); return; }
+  if(a==='lineedit'){ const l=S.budget.find(x=>x.id===id); const back=modal&&modal.kind==='line'?{kind:'line',id:modal.id}:null;
+    modalAt=Date.now(); modal={kind:'lineedit',back,draft:{id:l.id,name:l.name,planned:l.planned||''}}; render(); return; }
+  if(a==='delline'){ const i=S.budget.findIndex(x=>x.id===id); if(i<0) return;
+    const [l]=S.budget.splice(i,1); deleted('\u201c'+l.name+'\u201d',()=>S.budget.splice(i,0,l)); return; }
+  if(a==='newspend'){ const back=modal&&modal.kind==='line'?{kind:'line',id:modal.id}:null;
+    modalAt=Date.now(); modal={kind:'spend',back,draft:{id:uid(),lineId:id,amount:'',date:new Date().toISOString().slice(0,10),note:''}}; render(); return; }
+  if(a==='delspend'){ const l=S.budget.find(x=>x.id===btn.dataset.line); if(!l) return;
+    const i=(l.entries||[]).findIndex(e=>e.id===id); if(i<0) return;
+    const [e]=l.entries.splice(i,1); deleted(money(num(e.amount))+' from '+l.name,()=>l.entries.splice(i,0,e)); return; }
+  if(a==='newbuy'){ modalAt=Date.now(); modal={kind:'buyedit',isNew:true,draft:{id:uid(),title:'',est:'',note:'',url:'',lineId:'',bought:null,paid:''}}; render(); return; }
+  if(a==='buyedit'){ const b=S.buy.find(x=>x.id===id); modalAt=Date.now(); modal={kind:'buyedit',draft:{...b,est:b.est||'',paid:b.paid||''}}; render(); return; }
+  if(a==='togglebuy'){
+    const b=S.buy.find(x=>x.id===id);
+    const flip=o=>{ if(o.bought){ o.bought=null; } else { o.bought=new Date().toISOString().slice(0,10); if(!num(o.paid)) o.paid=num(o.est); } };
+    if(modal&&modal.kind==='buyedit'&&modal.draft.id===id){ flip(modal.draft); commitDraft(); render(); return; }
+    if(!b) return; flip(b); render(); save(); return; }
+  if(a==='delbuy'){ const i=S.buy.findIndex(x=>x.id===id); if(i<0) return;
+    const [b]=S.buy.splice(i,1); deleted('\u201c'+b.title+'\u201d',()=>S.buy.splice(i,0,b)); return; }
+  if(a==='connect'){ modalAt=Date.now(); modal={kind:'connect',code:cloud.code||''}; render(); return; }
+  if(a==='nocloud'){ LS('hq:nocloud','1'); closeModal(); render(); return; }
+  if(a==='doconnect'){
+    const code=(modal.code||'').trim().toLowerCase();
+    if(!/^[a-z0-9][a-z0-9-]{7,}$/.test(code)){ modal.joinNote='The code needs at least eight characters: letters, numbers and dashes only.'; render(); return; }
+    if(!cloud.hasConfig()){
+      const cfg=cloud.parseConfig(modal.cfg||'');
+      if(!cfg){ modal.joinNote='That config is missing apiKey, projectId or appId. Paste the whole block from the console.'; render(); return; }
+      cloud.config=cfg; LS('hq:fbconfig',JSON.stringify(cfg));
+    }
+    if(cloud.status==='on'||cloud.status==='error') await cloud.disconnect();
+    cloud.code=code; LS('hq:house',code); LS('hq:nocloud',null);
+    modal=null; tab='house'; render(); cloud.connect(); return; }
+  if(a==='reconnect'){ cloud.status='off'; cloud.connect(); return; }
+  if(a==='disconnect'){ await cloud.disconnect(); setNote('Sharing stopped on this phone. Your copy is still here.','ok'); render(); return; }
+  if(a==='copycode'){ if(navigator.clipboard) navigator.clipboard.writeText(cloud.code).then(()=>setNote('House code copied.','ok'),()=>setNote(cloud.code)); else setNote(cloud.code); return; }
+  if(a==='dopaste'){ const t=(document.getElementById('pst')||{}).value||''; if(!t.trim()){ setNote('Nothing pasted yet.'); return; } await applyRestore(t.trim()); return; }
+});
+
+/* ---------- backup / restore / export ---------- */
+async function backup(){
+  const photos={};
+  for(const p of S.photos){ const d=photoCache[p.id]??(S.photoData&&S.photoData[p.id])??await store.get(PKEY(p.id)); if(d) photos[p.id]=d; }
+  const text=JSON.stringify({app:'househq',v:3,state:S,photos},null,1);
+  modalAt=Date.now(), modal={kind:'backup',text}; render();
+}
+function markBackedUp(){ S.lastBackup=new Date().toISOString(); save(); if(tab==='house'&&!modal) render(); }
+function saveFile(text,name,type){
+  try{
+    const blob=new Blob([text],{type});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=name;
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); },3000);
+    return true;
+  }catch(e){ return false; }
+}
+/* Bring any older save up to the current shape. */
+function normalize(){
+  if(!S.photos) S.photos=[];
+  if(!S.photoData) S.photoData={};
+  if(!S.yearly) S.yearly=[];
+  if(!S.yearlyDone) S.yearlyDone={};
+  if(!S.equipDone) S.equipDone={};
+  if(!S.closedPhases){
+    S.closedPhases={};
+    if(S.closingDone) S.closedPhases['Before closing']=new Date().toISOString().slice(0,10);
+    delete S.closingDone;
+  }
+  // The seasonal list starts fresh every January on its own; past years stay browsable.
+  S.activeYear=new Date().getFullYear();
+  S.yearly.forEach(x=>{ if(!x.season) x.season=seasonOf(x.month||1); if(x.month===undefined||x.month===null) x.month=0; });
+  if(!S.createdAt) S.createdAt=new Date().toISOString();
+  if(!S.budget) S.budget=budgetSeed();
+  if(!S.buy) S.buy=[];
+  S.v=6;
+}
+/* A gentle reminder to back up: after two weeks with none, then every two months. Snoozes two weeks once shown. */
+function backupNudge(){
+  if(!store.saving()||noteMsg) return;
+  const day=864e5, now=Date.now();
+  const last=S.lastBackup?Date.parse(S.lastBackup):null;
+  const age=(now-(last||Date.parse(S.createdAt)))/day;
+  const since=S.backupNagAt?(now-Date.parse(S.backupNagAt))/day:99;
+  if(age>=(last?60:14)&&since>=14){
+    S.backupNagAt=new Date().toISOString(); save();
+    setNote(last?`It has been ${Math.round(age)} days since your last backup. Grab one from the House tab.`:'No backup yet. Grab one from the House tab when you get a minute.');
+  }
+}
+async function applyRestore(text){
+  try{
+    const data=JSON.parse(text);
+    if(!data.state) throw 0;
+    S=data.state; normalize();
+    if(!setupOpen()) tab='seasons';
+    if(data.photos) for(const id in data.photos){ photoCache[id]=data.photos[id]; await store.set(PKEY(id),data.photos[id]); cloud.photoWritten(id,data.photos[id]); }
+    modal=null; render(); save(); setNote('');
+  }catch(err){ setNote('That did not look like a House HQ backup.'); }
+}
+function pickBackupFile(){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json,text/plain';
+  inp.onchange=async()=>{ const f=inp.files[0]; if(f) await applyRestore(await f.text()); };
+  inp.click();
+}
+function selectText(elId){
+  const ta=document.getElementById(elId);
+  if(ta){ ta.focus(); ta.select(); setNote('Copy was blocked. The text is selected, so use your copy button.'); }
+}
+/* ---------- calendar export ---------- */
+const icsText=v=>String(v??'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+const icsLine=l=>(l.match(/[\s\S]{1,60}/g)||['']).join('\r\n ');
+function buildICS(){
+  const now=new Date(), thisY=now.getFullYear(), thisM=now.getMonth()+1;
+  const stamp=now.toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+  const pad=n=>String(n).padStart(2,'0');
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//House HQ//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:House HQ'];
+  let count=0;
+  for(const x of S.yearly){
+    if(!(x.title||'').trim()) continue;
+    const month=+x.month||seasonMonths(x.season)[0]||1;
+    const fi=freqInfo(x.freq);
+    let year=month>=thisM?thisY:thisY+1;
+    if(fi.years>1){ const last=lastDoneBefore(x.id,thisY+1); if(last&&last+fi.years>year) year=last+fi.years; }
+    const rule=fi.months?`FREQ=MONTHLY;INTERVAL=${fi.months}`:fi.weeks?'FREQ=WEEKLY':`FREQ=YEARLY${fi.years>1?';INTERVAL='+fi.years:''}`;
+    const d=`${year}${pad(month)}01`, dEnd=`${month===12?year+1:year}${pad(month===12?1:month+1)}01`;
+    const desc=[x.cat,x.freq,x.notes].filter(Boolean).join(' — ');
+    L.push('BEGIN:VEVENT',`UID:${x.id}@househq`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${dEnd}`,`RRULE:${rule}`,
+      icsLine(`SUMMARY:${icsText(x.title)}`),icsLine(`DESCRIPTION:${icsText(desc)}`),
+      'BEGIN:VALARM','ACTION:DISPLAY',icsLine(`DESCRIPTION:${icsText(x.title)}`),'TRIGGER:PT9H','END:VALARM','END:VEVENT');
+    count++;
+  }
+  L.push('END:VCALENDAR');
+  return {text:L.join('\r\n')+'\r\n',count};
+}
+function icsFile(text){ try{ return new File([text],'house-hq.ics',{type:'text/calendar'}); }catch(e){ return null; } }
+function openCalendarSheet(){
+  const {text,count}=buildICS();
+  const f=icsFile(text);
+  const canShare=!!(f&&navigator.canShare&&navigator.canShare({files:[f]}));
+  modalAt=Date.now(); modal={kind:'calendar',text,count,canShare}; render();
+}
+
+
+/* ============================================================
+   Boot
+============================================================ */
+(async()=>{
+  await store.init();
+  const raw=await store.get(KEY);
+  try{ S=raw?JSON.parse(raw):seed(); }catch(e){ S=seed(); }
+  normalize();
+  const lt=LS('hq:theme'); if(lt&&THEMES[lt]) S.theme=lt;
+  if(!setupOpen()) tab='seasons';
+  if(!store.saving()) setNote('This browser is not letting the app save. Download a backup before you close it.');
+  render();
+  await cloud.init();
+  if(!cloud.code&&!LS('hq:nocloud')&&location.protocol==='https:'){ modalAt=Date.now(); modal={kind:'connect',code:''}; render(); }
+  backupNudge();
+  if('serviceWorker' in navigator&&location.protocol==='https:') navigator.serviceWorker.register('./sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
