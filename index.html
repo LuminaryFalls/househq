@@ -49,6 +49,7 @@ window.dispatchEvent(new Event('fbloader'));
 </div>
 <div id="modal"></div>
 <input type="file" id="picker" accept="image/*" capture="environment">
+<input type="file" id="docpicker">
 
 <script>
 /* ============================================================
@@ -59,6 +60,9 @@ const I = {
   list:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
   cal:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="1"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
   cam:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  link:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  grid:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
+  paper:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
   coin:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5h-2.5a1.75 1.75 0 0 0 0 3.5H14.5"/></svg>',
   wrench:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
   home:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
@@ -286,7 +290,7 @@ function seed(){
     specs:[['Furnace filter',''],['Humidifier pad',''],['Well sediment filter',''],['Water heater element',''],['Fridge water filter','']].map(([k,v])=>({id:uid(),k,v})),
     logs:[], photos:[],
     contacts:[],
-    budget:budgetSeed(), buy:[]
+    budget:budgetSeed(), buy:[], files:[]
   };
 }
 
@@ -294,8 +298,7 @@ function seed(){
    App state
 ============================================================ */
 let S=null, tab='list', filter='All', q='', seasonSel=currentSeason(), editing=false, slippedOpen=false,
-    openEquip=null, modal=null, photoCache={}, noteMsg='', noteKind='', modalAt=0,
-    draftContact={name:'',role:'',phone:''};
+    openEquip=null, modal=null, photoCache={}, noteMsg='', noteKind='', modalAt=0;
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -421,6 +424,13 @@ document.getElementById('picker').addEventListener('change',async e=>{
   pickCb=null;
 });
 function pick(cb){ pickCb=cb; document.getElementById('picker').click(); }
+let docCb=null;
+document.getElementById('docpicker').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value='';
+  if(f&&docCb) await docCb(f);
+  docCb=null;
+});
+function pickDoc(cb){ docCb=cb; document.getElementById('docpicker').click(); }
 
 /* ============================================================
    Sharing — Firebase Firestore
@@ -439,8 +449,8 @@ const FIREBASE_CONFIG={   // Troy's Firebase project; safe to ship, the security
 };
 const FIREBASE_SDK='12.17.1';
 const LS=(k,v)=>{ try{ if(v===undefined) return localStorage.getItem(k); if(v===null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){ return null; } };
-const SYNC_KEY='hq:synced', PEND_KEY='hq:pendingphotos';
-const SHARED_COLS=['tasks','yearly','equipment','logs','photos','contacts','specs','budget','buy'];
+const SYNC_KEY='hq:synced', PEND_KEY='hq:pendingphotos', PENDF_KEY='hq:pendingfiles';
+const SHARED_COLS=['tasks','yearly','equipment','logs','photos','contacts','specs','budget','buy','files'];
 const CHECK_MAPS=['yearlyDone','equipDone'];
 const META_FIELDS=['propertyName','closedPhases','lastBackup','createdAt'];
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -509,7 +519,7 @@ function emptyShell(base){
 const cloud={
   status:'off',   // off | loading | connecting | on | error
   code:LS('hq:house')||'', config:null, FB:null, db:null, unsubs:[], err:'',
-  lastSynced:null, pendingPhotos:new Set(), pushing:false, pushAgain:false, pullT:null,
+  lastSynced:null, pendingPhotos:new Set(), pendingFiles:new Set(), pushing:false, pushAgain:false, pullT:null,
   hasConfig(){ return !!(FIREBASE_CONFIG||this.config); },
   parseConfig(text){
     const o={}, re=/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g; let m;
@@ -520,6 +530,7 @@ const cloud={
     try{ this.config=FIREBASE_CONFIG||JSON.parse(LS('hq:fbconfig')||'null'); }catch(e){ this.config=null; }
     try{ const r=await store.get(SYNC_KEY); this.lastSynced=r?JSON.parse(r):null; }catch(e){ this.lastSynced=null; }
     try{ this.pendingPhotos=new Set(JSON.parse(await store.get(PEND_KEY)||'[]')); }catch(e){}
+    try{ this.pendingFiles=new Set(JSON.parse(await store.get(PENDF_KEY)||'[]')); }catch(e){}
     if(this.code&&this.hasConfig()) this.connect();
   },
   ref(col,id){ const FB=this.FB; return col==='meta'?FB.doc(this.db,'houses',this.code):FB.doc(this.db,'houses',this.code,col,id); },
@@ -549,6 +560,7 @@ const cloud={
       this.status='on'; this.paint();
       this.listen();
       this.flushPhotos();
+      this.flushFiles();
       this.push();
     }catch(e){ this.status='error'; this.err=friendlyErr(e); this.paint(); }
   },
@@ -654,6 +666,48 @@ const cloud={
     }
     await store.set(PEND_KEY,JSON.stringify([...this.pendingPhotos]));
   },
+  /* files go up in chunks so a big blueprint still fits Firestore's per-document limit */
+  async fileWritten(id){
+    if(!this.code) return;
+    this.pendingFiles.add(id); await store.set(PENDF_KEY,JSON.stringify([...this.pendingFiles]));
+    this.flushFiles();
+  },
+  async flushFiles(){
+    if(this.status!=='on'||!this.pendingFiles.size) return;
+    for(const id of [...this.pendingFiles]){
+      try{
+        const raw=fileCache[id]||await store.get(FKEY(id));
+        if(!raw){ this.pendingFiles.delete(id); continue; }
+        const data=await base64Of(raw);
+        const total=Math.ceil(data.length/CHUNK);
+        for(let n=0;n<total;n++)
+          await this.FB.setDoc(this.ref('filedata',id+'_'+n),{d:data.slice(n*CHUNK,(n+1)*CHUNK),n,total});
+        const rec=S.files.find(x=>x.id===id);
+        if(rec&&rec.chunks!==total){ rec.chunks=total; save(); }
+        this.pendingFiles.delete(id);
+      }catch(e){ this.err=friendlyErr(e); break; }
+    }
+    await store.set(PENDF_KEY,JSON.stringify([...this.pendingFiles]));
+  },
+  async fetchFile(id,chunks){
+    if(this.status!=='on') return null;
+    try{
+      let out='';
+      for(let n=0;n<(chunks||1);n++){
+        const s2=await this.FB.getDoc(this.ref('filedata',id+'_'+n));
+        if(!s2.exists()) return null;
+        out+=s2.data().d;
+      }
+      let keep=out;
+      try{ keep=dataURLtoBlob(out); }catch(e){}
+      await store.set(FKEY(id),keep);
+      return keep;
+    }catch(e){ return null; }
+  },
+  deleteFile(id,chunks){
+    if(this.status!=='on') return;
+    for(let n=0;n<(chunks||1);n++){ try{ this.FB.deleteDoc(this.ref('filedata',id+'_'+n)); }catch(e){} }
+  },
   async fetchPhoto(id){
     if(this.status!=='on') return null;
     try{ const s=await this.FB.getDoc(this.ref('photodata',id)); const d=s.exists()?s.data().d:null;
@@ -677,6 +731,130 @@ const cloud={
   paint(){ if(tab==='house'&&!modal) render(); }
 };
 document.addEventListener('focusout',()=>{ if(pendingRender&&!(modal&&modal.draft)){ pendingRender=false; setTimeout(render,80); } });
+
+/* ============================================================
+   Attachments — spreadsheets, blueprints, PDFs, anything
+   The file itself lives on the phone. When sharing is on it is also
+   split into chunks in Firestore so the other phone can pull it down.
+   An entry can instead be just a web link (a Google Sheet, say).
+============================================================ */
+const FKEY=id=>'hqfile:'+id;
+const FILE_MAX=200*1024*1024;         // what the phone will hold
+const SHARE_MAX=20*1024*1024;         // past this it stays on this phone rather than syncing
+const CHUNK=700000;                   // stays inside Firestore's 1 MB document limit
+const FILE_CATS=['Plans','Budget','Papers'];
+const fileCache={};
+const prettySize=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const isSheet=f=>/sheet|excel|csv|numbers/i.test(f.type||'')||/\.(xlsx?|xlsm|csv|numbers)$/i.test(f.name||'');
+const fileIcon=f=>f.url&&!f.stored?I.link:isSheet(f)?I.grid:/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'')?I.doc:/^image\//.test(f.type||'')?I.img:I.paper;
+
+/* A web address typed without the https:// still has to work as a link. */
+function fixURL(u){
+  const v=String(u||'').trim();
+  if(!v) return '';
+  return /^[a-z][a-z0-9+.-]*:/i.test(v)?v:'https://'+v;
+}
+function readFile(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=()=>rej(new Error('could not read the file'));
+    r.readAsDataURL(file);
+  });
+}
+const blobOf=v=>v instanceof Blob?v:dataURLtoBlob(v);
+async function base64Of(v){
+  const d=v instanceof Blob?await readFile(v):v;
+  return String(d);
+}
+async function freeSpace(){
+  try{ const e=await navigator.storage.estimate(); return (e.quota||0)-(e.usage||0); }catch(e){ return null; }
+}
+async function addFile(file,meta){
+  if(file.size>FILE_MAX){ setNote(`That file is ${prettySize(file.size)}, past the ${prettySize(FILE_MAX)} limit.`); return null; }
+  const free=await freeSpace();
+  if(free!==null&&free<file.size*1.4){
+    setNote(`Not enough room left on this phone for ${prettySize(file.size)} — about ${prettySize(Math.max(0,free))} free. Delete a photo or file and try again.`);
+    return null;
+  }
+  const id=uid();
+  // A Blob goes straight into IndexedDB. Other storage modes need text, so fall back to base64.
+  let payload=file, data=null;
+  if(store.mode!=='idb'){
+    try{ data=await readFile(file); payload=data; }
+    catch(e){ setNote('Could not read that file.'); return null; }
+  }
+  let ok=false;
+  try{ ok=await store.set(FKEY(id),payload); }catch(e){ ok=false; }
+  if(!ok&&store.mode==='idb'){
+    try{ data=await readFile(file); ok=await store.set(FKEY(id),data); payload=data; }catch(e){ ok=false; }
+  }
+  if(!ok){
+    setNote(`${prettySize(file.size)} was too much for this browser to store.`+(store.mode==='artifact'?' Open the app from your home screen instead of inside Claude and it will handle far bigger files.':''));
+    return null;
+  }
+  fileCache[id]=payload;
+  const rec={id,name:file.name||'Untitled',type:file.type||'',size:file.size,
+    cat:meta.cat||'Papers',note:meta.note||'',url:'',stored:true,
+    shared:file.size<=SHARE_MAX,
+    chunks:Math.ceil((file.size*4/3+64)/CHUNK),
+    addedAt:new Date().toISOString().slice(0,16).replace('T',' ')};
+  S.files.unshift(rec);
+  await save();
+  if(rec.shared) cloud.fileWritten(id);
+  else if(cloud.code) setNote(`${esc(rec.name)} is saved here, but it is too big to sync — it stays on this phone.`);
+  return rec;
+}
+async function getFileData(id){
+  if(fileCache[id]!==undefined&&fileCache[id]!==null) return fileCache[id];
+  let d=await store.get(FKEY(id));
+  if(!d){ const f=S.files.find(x=>x.id===id); d=await cloud.fetchFile(id,f&&f.chunks); }
+  fileCache[id]=d||null;
+  return d;
+}
+function dataURLtoBlob(d){
+  const [head,b64]=String(d).split(',');
+  const type=(/data:([^;]+)/.exec(head)||[])[1]||'application/octet-stream';
+  const bin=atob(b64||''); const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type});
+}
+/* Open it in whatever app the phone uses for that kind of file. */
+async function openFile(id){
+  const f=S.files.find(x=>x.id===id); if(!f) return;
+  if(f.url&&!f.stored){ window.open(f.url,'_blank','noopener'); return; }
+  setNote('Opening '+f.name+'…','ok');
+  const d=await getFileData(id);
+  if(!d){ setNote(f.shared===false?'This file only exists on the phone it was added from.':'That file is not on this phone yet. Open it once where it was added, or check the connection.'); return; }
+  setNote('');
+  try{
+    const blob=blobOf(d), url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=f.name; a.rel='noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(e){ setNote('This browser would not open that file.'); }
+}
+function fileRow(f){
+  return `<div class="row">
+    <button class="fico" data-act="openfile" data-id="${f.id}" aria-label="Open">${fileIcon(f)}</button>
+    <button class="body" data-act="openfile" data-id="${f.id}">
+      <div class="t">${esc(f.name)}</div>
+      <div class="m">${[f.note,f.stored?prettySize(f.size):'link',f.stored?'':(f.url||'').replace(/^https?:\/\//,'').split('/')[0],f.stored&&f.shared===false&&cloud.code?'this phone only':''].filter(Boolean).map(esc).join(' · ')}</div>
+    </button>
+    ${editing?`<button class="icb" data-act="fileedit" data-id="${f.id}" aria-label="Edit">${I.pencil}</button>
+    <button class="icb" data-act="delfile" data-id="${f.id}" aria-label="Remove">${I.trash}</button>`:''}
+  </div>`;
+}
+function filesSection(cat,blurb){
+  const rows=(S.files||[]).filter(f=>f.cat===cat);
+  return `${rows.map(fileRow).join('')}
+    ${rows.length?'':`<p class="hint" style="margin:6px 0">${blurb}</p>`}
+    <div class="btns h" style="margin-top:10px">
+      <button class="btn dash" data-act="addfile" data-v="${cat}">${I.plus} Upload a file</button>
+      <button class="btn dash" data-act="addlink" data-v="${cat}">${I.link} Add a link</button>
+    </div>`;
+}
 
 /* ---------- derived ---------- */
 const yearKey=(id,y)=>id+':'+y;
@@ -878,6 +1056,9 @@ h2.sec em{font-style:normal;font-size:13px;font-weight:500;color:${t.ink70};font
 .undobtn{margin-left:auto;background:${t.paper};color:${t.ink};border:0;border-radius:8px;padding:6px 14px;font-weight:700;font-size:14px;flex:0 0 auto}
 .box.soft{background:${t.goodSoft};border-color:${t.goodSoft};color:${t.good}}
 .notdue .t{color:${t.ink70}}
+h3.sub{font:700 16px ${HEAD};margin:18px 0 6px;color:${t.ink70}}
+.fico{width:42px;height:42px;flex:0 0 42px;border:1px solid ${t.rule};border-radius:10px;background:${t.ground};
+  display:grid;place-items:center;color:${t.accent};padding:0}
 .bar{height:8px;border-radius:4px;background:${t.rule};overflow:hidden;width:100%}
 .bar i{display:block;height:100%;background:${t.accent};border-radius:4px;transition:width .2s}
 .bar i.over{background:${t.warn}}
@@ -1199,6 +1380,9 @@ function viewBudget(){
     <button class="btn dash" style="margin-top:10px" data-act="newbuy">${I.plus} Add something to buy</button>
     ${got.length?`<h4 style="margin:18px 0 4px;font:700 15px ${'Barlow Condensed'},sans-serif;color:var(--ink70)">Bought in ${y}</h4>${got.map(buyRow).join('')}`:''}
   </section>
+  <section class="grp"><h3>Spreadsheets<span>opens in your sheet app</span></h3>
+    ${filesSection('Budget','Nothing yet. Upload a spreadsheet, or link one you keep in Google Sheets or OneDrive.')}
+  </section>
   <p class="hint" style="margin-top:12px">Planned amounts are per year. Spending comes from what you add on each line, from purchases you tick off, and from any cost you put on a service record.</p>`;
 }
 
@@ -1291,19 +1475,26 @@ function viewHouse(){
     closedList().length?`<p class="hint" style="margin-top:12px">Closed out: ${closedList().map(p=>
     `${esc(p)} <button class="btn" style="display:inline-flex;width:auto;min-height:0;padding:3px 9px;font-size:12.5px" data-act="reopenphase" data-v="${esc(p)}">bring back</button>`).join(' · ')}</p>`:''}
 
+  <div style="display:flex;align-items:center;gap:8px;margin:28px 0 8px">
+    <h2 class="sec" style="margin:0;flex:1">Plans and papers</h2>
+    <button class="btn editbtn ${editing?'on':''}" data-act="edit">${editing?'Done':'Edit'}</button>
+  </div>
+  <h3 class="sub">Blueprints and layouts</h3>
+  ${filesSection('Plans','Nothing yet. Upload the blueprints, the plat survey, a room layout — anything you want on hand.')}
+  <h3 class="sub">Papers</h3>
+  ${filesSection('Papers','Nothing yet. The deed, the well report, warranties, manuals.')}
+
   <h2 class="sec">Who to call</h2>
   ${S.contacts.map(c=>`<div class="row">
-    <div class="body"><div class="t">${esc(c.name)}</div><div class="m">${esc(c.role)}</div></div>
+    <button class="body" data-act="contact" data-id="${c.id}">
+      <div class="t">${esc(c.name)}</div>
+      <div class="m">${[c.role,c.note].filter(Boolean).map(esc).join(' · ')}</div></button>
+    ${c.url?`<a class="icb" href="${esc(c.url)}" target="_blank" rel="noopener" aria-label="Website">${I.link}</a>`:''}
     ${c.phone?`<a href="tel:${esc(c.phone.replace(/[^\d]/g,''))}" style="font-weight:600;white-space:nowrap">${esc(c.phone)}</a>`:''}
-    <button class="icb" data-act="delcontact" data-id="${c.id}">${I.trash}</button></div>`).join('')}
-  <div class="addbox">
-    <input data-act="nc" data-f="name" value="${esc(draftContact.name)}" placeholder="Name — who or what company">
-    <div style="display:flex;gap:8px">
-      <input data-act="nc" data-f="role" value="${esc(draftContact.role)}" placeholder="What they do">
-      <input data-act="nc" data-f="phone" value="${esc(draftContact.phone)}" placeholder="Phone" inputmode="tel">
-    </div>
-    <button class="btn dark" data-act="savecontact">${I.plus} Add this contact</button>
-  </div>
+    ${editing?`<button class="icb" data-act="delcontact" data-id="${c.id}" aria-label="Remove">${I.trash}</button>`:''}
+  </div>`).join('')}
+  ${S.contacts.length?'':'<p class="hint">Nobody yet. Add the well driller, the propane outfit, whoever you would actually call.</p>'}
+  <button class="btn dash" style="margin-top:10px" data-act="newcontact">${I.plus} Add a contact</button>
 
   <h2 class="sec">Service history</h2>
   ${S.logs.length?logHTML(S.logs,true):'<p class="hint">Nothing recorded yet. Every check, cleaning and service you log lands here in date order.</p>'}
@@ -1489,6 +1680,32 @@ function modalHTML(){
       <button class="btn ${d.bought?'':'solid'}" data-act="togglebuy" data-id="${d.id}">${d.bought?'Mark as not bought':I.check+' Mark as bought'}</button>
       <button class="btn ${d.bought?'solid':''}" data-act="done">Done</button>`,true);
   }
+  if(modal.kind==='fileedit'){
+    const d=modal.draft, link=!d.stored;
+    return sheet(modal.isNew?(link?'Add a link':'Name this file'):'Edit',`
+      <label class="lbl">Name<input data-m="name" value="${esc(d.name)}" placeholder="What is it"></label>
+      ${link?`<label class="lbl">Web address<input data-m="url" value="${esc(d.url)}" placeholder="https://" inputmode="url" autocapitalize="none" spellcheck="false"></label>`:''}
+      <label class="lbl">Where it belongs<select data-m="cat">${FILE_CATS.map(c=>`<option ${d.cat===c?'selected':''}>${c}</option>`).join('')}</select></label>
+      <input data-m="note" value="${esc(d.note)}" placeholder="A note about it">
+      ${d.stored?`<p class="hint" style="margin:0">${esc(prettySize(d.size))}${!cloud.code?' · on this phone':d.shared===false?' · too big to sync, stays on this phone':' · shared with the other phones'}</p>`:''}
+      <button class="btn solid" data-act="done">Done</button>`,true);
+  }
+  if(modal.kind==='contact'){
+    const d=modal.draft;
+    return sheet(modal.isNew?'New contact':'Edit contact',`
+      <input data-m="name" value="${esc(d.name)}" placeholder="Name — who or what company">
+      <div style="display:flex;gap:8px">
+        <input data-m="role" value="${esc(d.role)}" placeholder="What they do">
+        <input data-m="phone" value="${esc(d.phone)}" placeholder="Phone" inputmode="tel">
+      </div>
+      <input data-m="url" value="${esc(d.url)}" placeholder="Website" inputmode="url" autocapitalize="none" spellcheck="false">
+      <input data-m="note" value="${esc(d.note)}" placeholder="Account number, gate code, who to ask for">
+      <div class="btns h">
+        ${d.phone?`<a class="btn" href="tel:${esc((d.phone||'').replace(/[^\d]/g,''))}">Call</a>`:''}
+        ${d.url?`<a class="btn" href="${esc(d.url)}" target="_blank" rel="noopener">Website</a>`:''}
+      </div>
+      <button class="btn solid" data-act="done">Done</button>`,true);
+  }
   if(modal.kind==='paste'){
     return sheet('Restore from pasted text',`
       <p class="hint" style="margin:0">Paste the backup text you copied from the other copy of the app. This replaces everything here.</p>
@@ -1566,6 +1783,17 @@ function commitDraft(){
     const rec={id:d.id,title:d.title,est:num(d.est),note:d.note||'',url:d.url||'',lineId:d.lineId||'',bought:d.bought||null,paid:num(d.paid)};
     const i=S.buy.findIndex(x=>x.id===d.id);
     if(i>=0) S.buy[i]={...S.buy[i],...rec}; else S.buy.push(rec);
+  }else if(modal.kind==='fileedit'){
+    const i=S.files.findIndex(x=>x.id===d.id);
+    if(!d.stored&&!(d.url||'').trim()&&!(d.name||'').trim()){ if(i>=0) S.files.splice(i,1); return; }
+    const url=fixURL(d.url);
+    const rec={...d,url,name:(d.name||'').trim()||url.replace(/^https?:\/\//,'').split('/')[0]||'Untitled'};
+    if(i>=0) S.files[i]=rec; else S.files.unshift(rec);
+  }else if(modal.kind==='contact'){
+    const has=(d.name||'').trim()||(d.phone||'').trim()||(d.url||'').trim();
+    const rec={...d,url:fixURL(d.url)};
+    const i=S.contacts.findIndex(x=>x.id===d.id);
+    if(i>=0) S.contacts[i]=rec; else if(has) S.contacts.push(rec); else return;
   }else if(modal.kind==='log'){
     const has=(d.what||'').trim()||(d.who||'').trim()||(d.cost||'').trim()||(d.doc||'').trim()||(d.photos&&d.photos.length);
     const rec={id:d.id,refId:d.refId,subject:d.subject,what:d.what,who:d.who,cost:d.cost,doc:d.doc,
@@ -1606,7 +1834,6 @@ document.addEventListener('input',async e=>{
     q2.specs.find(x=>x.id===el.dataset.sid)[el.dataset.f]=el.value; saveSoon(); return; }
   if(a==='echk'){ const q2=S.equipment.find(x=>x.id===el.dataset.id);
     q2.checks.find(x=>x.id===el.dataset.cid)[el.dataset.f]=el.value; saveSoon(); return; }
-  if(a==='nc'){ draftContact[el.dataset.f]=el.value; return; }
   if(a==='caption'||a==='where'){ const p=S.photos.find(x=>x.id===el.dataset.id);
     p[a==='caption'?'caption':'where']=el.value; saveSoon(); return; }
 });
@@ -1720,11 +1947,8 @@ document.addEventListener('click',async e=>{
   if(a==='delequip'){ const i=S.equipment.findIndex(x=>x.id===id); if(i<0) return;
     const [e2]=S.equipment.splice(i,1); deleted(e2.name,()=>S.equipment.splice(i,0,e2)); return; }
 
-  if(a==='savecontact'){
-    if(!draftContact.name.trim() && !draftContact.phone.trim()){ setNote('Give the contact a name or a number first.'); return; }
-    S.contacts.push({id:uid(),...draftContact});
-    draftContact={name:'',role:'',phone:''};
-    render(); save(); return; }
+  if(a==='newcontact'){ modalAt=Date.now(); modal={kind:'contact',isNew:true,draft:{id:uid(),name:'',role:'',phone:'',url:'',note:''}}; render(); return; }
+  if(a==='contact'){ const c=S.contacts.find(x=>x.id===id); modalAt=Date.now(); modal={kind:'contact',draft:{...c}}; render(); return; }
   if(a==='delcontact'){ const i=S.contacts.findIndex(c=>c.id===id); if(i<0) return;
     const [c]=S.contacts.splice(i,1); deleted(c.name||'the contact',()=>S.contacts.splice(i,0,c)); return; }
 
@@ -1738,6 +1962,24 @@ document.addEventListener('click',async e=>{
     return; }
   if(a==='pickbackup'){ pickBackupFile(); return; }
   if(a==='pasterestore'){ modalAt=Date.now(); modal={kind:'paste'}; render(); return; }
+  if(a==='openfile'){ await openFile(id); return; }
+  if(a==='addfile'){ const cat=v;
+    pickDoc(async f=>{ const rec=await addFile(f,{cat});
+      if(rec){ modalAt=Date.now(); modal={kind:'fileedit',isNew:true,draft:{...rec}}; }
+      render(); });
+    return; }
+  if(a==='addlink'){ modalAt=Date.now();
+    modal={kind:'fileedit',isNew:true,draft:{id:uid(),name:'',url:'',cat:v,note:'',stored:false,size:0,type:'',
+      addedAt:new Date().toISOString().slice(0,16).replace('T',' ')}};
+    render(); return; }
+  if(a==='fileedit'){ const f=S.files.find(x=>x.id===id); modalAt=Date.now(); modal={kind:'fileedit',draft:{...f}}; render(); return; }
+  if(a==='delfile'){ const i=S.files.findIndex(x=>x.id===id); if(i<0) return;
+    const [f]=S.files.splice(i,1), data=fileCache[id];
+    delete fileCache[id];
+    deleted('\u201c'+f.name+'\u201d',
+      ()=>{ S.files.splice(i,0,f); if(data) fileCache[id]=data; },
+      ()=>{ if(f.stored){ store.del(FKEY(id)); cloud.deleteFile(id,f.chunks); } });
+    return; }
   if(a==='line'){ modalAt=Date.now(); modal={kind:'line',id}; render(); return; }
   if(a==='newline'){ modalAt=Date.now(); modal={kind:'lineedit',isNew:true,draft:{id:uid(),name:'',planned:''}}; render(); return; }
   if(a==='lineedit'){ const l=S.budget.find(x=>x.id===id); const back=modal&&modal.kind==='line'?{kind:'line',id:modal.id}:null;
@@ -1816,7 +2058,9 @@ function normalize(){
   if(!S.createdAt) S.createdAt=new Date().toISOString();
   if(!S.budget) S.budget=budgetSeed();
   if(!S.buy) S.buy=[];
-  S.v=6;
+  if(!S.files) S.files=[];
+  S.contacts.forEach(c=>{ if(c.url===undefined) c.url=''; if(c.note===undefined) c.note=''; });
+  S.v=7;
 }
 /* A gentle reminder to back up: after two weeks with none, then every two months. Snoozes two weeks once shown. */
 function backupNudge(){
@@ -1837,6 +2081,7 @@ async function applyRestore(text){
     S=data.state; normalize();
     if(!setupOpen()) tab='seasons';
     if(data.photos) for(const id in data.photos){ photoCache[id]=data.photos[id]; await store.set(PKEY(id),data.photos[id]); cloud.photoWritten(id,data.photos[id]); }
+    if(data.files) for(const id in data.files){ fileCache[id]=data.files[id]; await store.set(FKEY(id),data.files[id]); cloud.fileWritten(id); }
     modal=null; render(); save(); setNote('');
   }catch(err){ setNote('That did not look like a House HQ backup.'); }
 }
